@@ -51,8 +51,8 @@ window.buildTower = function(towerType) {
             fire: {
                 name: "Fire Tower",
                 ranks: [
-                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
-                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
+                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.5, critMultiplier: 1.75, color: 0xff4500 },
+                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.5, critMultiplier: 1.75, color: 0xff0000 }
                 ]
             }
         };
@@ -110,6 +110,9 @@ window.buildTower = function(towerType) {
         // Add special properties for specific tower types
         if (towerType === 'frost') {
             tower.slowEffect = towerRank.slowEffect;
+        } else if (towerType === 'fire') {
+            tower.critChance = towerRank.critChance;
+            tower.critMultiplier = towerRank.critMultiplier;
         }
         
         // Add tower to game
@@ -1977,6 +1980,9 @@ function buildTower(towerType) {
     // Add special properties for specific tower types
     if (towerType === 'frost') {
         tower.slowEffect = towerRank.slowEffect;
+    } else if (towerType === 'fire') {
+        tower.critChance = towerRank.critChance;
+        tower.critMultiplier = towerRank.critMultiplier;
     }
     
     // Add tower to game
@@ -2143,21 +2149,16 @@ function updateProjectiles(delta) {
         
         // Mark as reached if close enough
         if (distance < 0.5) {
-            // Deal damage
-            projectile.target.health -= projectile.damage;
-            gameState.totalDamage += projectile.damage;
-            updateTotalDamage();
+            let finalDamage = projectile.damage;
+            let isCritical = false;
             
-            // Show floating damage number
-            createFloatingDamageNumber(projectile.target.position, Math.floor(projectile.damage));
-            
-            // Create impact effect for frost towers
-            if (projectile.type === 'frost' && projectile.slowEffect > 0) {
-                // Apply slowing effect
-                applySlowEffect(projectile.target, projectile.slowEffect, projectile.towerRank);
+            // Check for critical hit on Fire Tower projectiles
+            if (projectile.type === 'fire' && Math.random() < projectile.critChance) {
+                finalDamage = projectile.damage * projectile.critMultiplier;
+                isCritical = true;
                 
-                // Create and add frost impact animation
-                const impactAnimation = createFrostImpactEffect(projectile.target.position);
+                // Create and add fire critical hit animation
+                const impactAnimation = createFireCriticalEffect(projectile.target.position);
                 
                 // Add to animation system
                 if (!gameState.activeAnimations) {
@@ -2166,17 +2167,21 @@ function updateProjectiles(delta) {
                 gameState.activeAnimations.push(impactAnimation);
             }
             
-            // Handle critical strike for Fire Tower
-            if (projectile.type === 'fire' && Math.random() < projectile.critChance) {
-                const critDamage = projectile.damage * projectile.critMultiplier;
-                projectile.target.health -= critDamage;
-                gameState.totalDamage += critDamage;
+            // Apply the damage
+            projectile.target.health -= finalDamage;
+            gameState.totalDamage += finalDamage;
+            updateTotalDamage();
+            
+            // Show floating damage number
+            createFloatingDamageNumber(projectile.target.position, Math.floor(finalDamage), isCritical);
+            
+            // Create impact effect for frost towers
+            if (projectile.type === 'frost' && projectile.slowEffect > 0) {
+                // Apply slowing effect
+                applySlowEffect(projectile.target, projectile.slowEffect, projectile.towerRank);
                 
-                // Show critical damage number
-                createFloatingDamageNumber(projectile.target.position, Math.floor(critDamage), true);
-                
-                // Create and add fire critical hit animation
-                const impactAnimation = createFireCriticalEffect(projectile.target.position);
+                // Create and add frost impact animation
+                const impactAnimation = createFrostImpactEffect(projectile.target.position);
                 
                 // Add to animation system
                 if (!gameState.activeAnimations) {
