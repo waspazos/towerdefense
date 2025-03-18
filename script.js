@@ -752,8 +752,8 @@ function generateTowerSlots() {
     // Create tower slots along all paths
     const slotPositions = [
         // Left path slots
-        { x: -15, z: -15 },
-        { x: -15, z: -5 },
+        { x: -18.5, z: -15 },  // Moved left by 3.5 units
+        { x: -18.5, z: -5 },   // Moved left by 3.5 units
         { x: -10, z: 0 },
         { x: -5, z: 5 },
         
@@ -764,8 +764,8 @@ function generateTowerSlots() {
         { x: 3.5, z: -5 },
         
         // Right path slots
-        { x: 15, z: -15 },
-        { x: 15, z: -5 },
+        { x: 18.5, z: -15 },   // Moved right by 3.5 units
+        { x: 18.5, z: -5 },    // Moved right by 3.5 units
         { x: 10, z: 0 },
         { x: 5, z: 5 }
     ];
