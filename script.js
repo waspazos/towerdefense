@@ -217,8 +217,8 @@ let gameState = {
         fire: {
             name: "Fire Tower",
             ranks: [
-                { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
-                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
+                { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.4, critMultiplier: 1.5, color: 0xff4500 },
+                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.4, critMultiplier: 1.5, color: 0xff0000 }
             ]
         }
     }
@@ -2148,6 +2148,9 @@ function updateProjectiles(delta) {
             gameState.totalDamage += projectile.damage;
             updateTotalDamage();
             
+            // Show floating damage number
+            createFloatingDamageNumber(projectile.target.position, Math.floor(projectile.damage));
+            
             // Create impact effect for frost towers
             if (projectile.type === 'frost' && projectile.slowEffect > 0) {
                 // Apply slowing effect
@@ -2168,7 +2171,18 @@ function updateProjectiles(delta) {
                 const critDamage = projectile.damage * projectile.critMultiplier;
                 projectile.target.health -= critDamage;
                 gameState.totalDamage += critDamage;
-                createCriticalHitEffect(projectile.position);
+                
+                // Show critical damage number
+                createFloatingDamageNumber(projectile.target.position, Math.floor(critDamage), true);
+                
+                // Create and add fire critical hit animation
+                const impactAnimation = createFireCriticalEffect(projectile.target.position);
+                
+                // Add to animation system
+                if (!gameState.activeAnimations) {
+                    gameState.activeAnimations = [];
+                }
+                gameState.activeAnimations.push(impactAnimation);
             }
             
             // Mark for removal
@@ -3042,4 +3056,189 @@ function updateCriticalHitParticles(delta) {
             gameState.criticalHitParticles.splice(i, 1);
         }
     }
+}
+
+// Create a fire critical hit explosion effect
+function createFireCriticalEffect(position) {
+    const impactGroup = new THREE.Group();
+    
+    // Central flash
+    const flashGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const flashMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.7
+    });
+    
+    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
+    impactGroup.add(flash);
+    
+    // Fire particles exploding outward
+    const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+    const particleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff8c00,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    const numParticles = 16;
+    const particles = [];
+    
+    for (let i = 0; i < numParticles; i++) {
+        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        
+        // Calculate position on a sphere
+        const phi = Math.acos(-1 + (2 * i) / numParticles);
+        const theta = Math.sqrt(numParticles * Math.PI) * phi;
+        
+        particle.position.set(
+            0.2 * Math.cos(theta) * Math.sin(phi),
+            0.2 * Math.sin(theta) * Math.sin(phi),
+            0.2 * Math.cos(phi)
+        );
+        
+        // Store original position for animation
+        particle.userData = {
+            originalPos: particle.position.clone(),
+            direction: particle.position.clone().normalize(),
+            speed: Math.random() * 2 + 3,
+            rotationSpeed: Math.random() * 2 + 1
+        };
+        
+        impactGroup.add(particle);
+        particles.push(particle);
+    }
+    
+    // Create fire ring effect
+    const ringGeometry = new THREE.RingGeometry(0.2, 0.6, 32);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide
+    });
+    
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    impactGroup.add(ring);
+    
+    // Set position
+    impactGroup.position.copy(position);
+    
+    // Add to scene
+    scene.add(impactGroup);
+    
+    // Animate the effect
+    const lifeTime = 0.6; // Effect lasts for 0.6 seconds
+    let elapsed = 0;
+    
+    function animateImpact(delta) {
+        elapsed += delta;
+        
+        if (elapsed >= lifeTime) {
+            // Remove from scene when animation is complete
+            scene.remove(impactGroup);
+            return false; // Stop animation
+        }
+        
+        // Progress from 0 to 1
+        const progress = elapsed / lifeTime;
+        
+        // Animate central flash - expand and fade
+        flash.scale.set(1 + progress * 2, 1 + progress * 2, 1 + progress * 2);
+        flashMaterial.opacity = 0.7 * (1 - progress);
+        
+        // Animate particles - move outward, rotate, and fade
+        particles.forEach(particle => {
+            const dir = particle.userData.direction;
+            const speed = particle.userData.speed;
+            const originalPos = particle.userData.originalPos;
+            
+            // Move outward
+            particle.position.copy(originalPos).add(
+                dir.clone().multiplyScalar(progress * speed)
+            );
+            
+            // Rotate particle
+            particle.rotation.x += particle.userData.rotationSpeed * delta;
+            particle.rotation.y += particle.userData.rotationSpeed * delta;
+            
+            // Fade out
+            particle.material.opacity = 0.8 * (1 - progress);
+        });
+        
+        // Animate ring - expand and fade
+        ring.scale.set(1 + progress * 3, 1 + progress * 3, 1 + progress * 3);
+        ringMaterial.opacity = 0.5 * (1 - progress);
+        
+        return true; // Continue animation
+    }
+    
+    // Return the animation function so it can be added to game loop
+    return animateImpact;
+}
+
+// Create floating damage number
+function createFloatingDamageNumber(position, damage, isCritical = false) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 1024; // Reduced from 2048
+    canvas.height = 512; // Reduced from 1024
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false
+    });
+    
+    // Create sprite
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(8, 4, 8); // Reduced from 16, 8, 16
+    sprite.position.copy(position);
+    sprite.position.y += 1.5; // Position above creep
+    
+    // Draw text on canvas
+    context.font = isCritical ? 'bold 256px Arial' : '192px Arial'; // Reduced from 512px/384px
+    context.fillStyle = '#FFFFFF'; // Pure white
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(damage.toString(), canvas.width/2, canvas.height/2);
+    
+    // Add to scene
+    scene.add(sprite);
+    
+    // Animate the floating number
+    const duration = 1.0; // Duration in seconds
+    const startY = sprite.position.y;
+    const endY = startY + 2; // Float up 2 units
+    let elapsed = 0;
+    
+    function animateDamageNumber(delta) {
+        elapsed += delta;
+        
+        if (elapsed >= duration) {
+            scene.remove(sprite);
+            return false; // Stop animation
+        }
+        
+        // Progress from 0 to 1
+        const progress = elapsed / duration;
+        
+        // Float upward
+        sprite.position.y = startY + (endY - startY) * progress;
+        
+        // Fade out
+        sprite.material.opacity = 1 - progress;
+        
+        return true; // Continue animation
+    }
+    
+    // Add to animation system
+    if (!gameState.activeAnimations) {
+        gameState.activeAnimations = [];
+    }
+    gameState.activeAnimations.push(animateDamageNumber);
 }
