@@ -1386,7 +1386,7 @@ function addSlowVisualEffect(creep) {
     
     // Create a blue particle system around the creep
     const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-    const particleMaterial = new THREE.MeshBasicMaterial({
+    const particleMaterial = new THREE.MeshStandardMaterial({
         color: 0x87CEFA,
         transparent: true,
         opacity: 0.7,
@@ -1423,7 +1423,7 @@ function addSlowVisualEffect(creep) {
     
     // Add ice crystals forming on the creep
     const crystalGeometry = new THREE.ConeGeometry(0.03, 0.15, 4);
-    const crystalMaterial = new THREE.MeshBasicMaterial({
+    const crystalMaterial = new THREE.MeshStandardMaterial({
         color: 0xCCEEFF,
         transparent: true,
         opacity: 0.8,
