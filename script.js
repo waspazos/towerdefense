@@ -2039,17 +2039,17 @@ function updateTowers(delta) {
             
             // For basic towers, always fire at least one projectile
             if (tower.type === 'basic') {
-                // Fire at first target
-                fireProjectile(tower, tower.targetCreep[0]);
+                // Fire at first target with full damage
+                fireProjectile(tower, tower.targetCreep[0], 1);
                 
-                // If there's a second target, fire at it too
+                // If there's a second target, fire at it with 50% damage
                 if (tower.targetCreep.length > 1) {
-                    console.log("Firing second projectile"); // Debug log
-                    fireProjectile(tower, tower.targetCreep[1]);
+                    console.log("Firing second projectile with 50% damage"); // Debug log
+                    fireProjectile(tower, tower.targetCreep[1], 0.5);
                 }
             } else {
                 // For other towers, fire at single target
-                fireProjectile(tower, tower.targetCreep[0]);
+                fireProjectile(tower, tower.targetCreep[0], 1);
             }
             
             // Reset cooldown
@@ -2059,7 +2059,7 @@ function updateTowers(delta) {
 }
 
 // 5. Fire projectile with proper color and effects
-function fireProjectile(tower, target) {
+function fireProjectile(tower, target, damageMultiplier = 1) {
     // Determine projectile color based on tower type and rank
     let projectileColor;
     
@@ -2096,7 +2096,7 @@ function fireProjectile(tower, target) {
         },
         target: target,
         speed: 15, // Units per second
-        damage: tower.damage,
+        damage: tower.damage * damageMultiplier,
         type: tower.type,
         towerRank: tower.rank,
         slowEffect: tower.type === 'frost' ? tower.slowEffect : 0,
