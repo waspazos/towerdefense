@@ -543,8 +543,7 @@ function updateRoundTracker() {
 function setupScene() {
     // Create scene
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-    scene.fog = new THREE.Fog(0x87CEEB, 40, 100);// Add fog for depth effect
+    scene.background = new THREE.Color(0x000000); // Black background
     
     // Create camera - positioned further back to show more of the scene
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -616,8 +615,12 @@ function createPath() {
 
 // Create forest environment (simplified - only mountains)
 function createForestEnvironment() {
-    // Only create distant mountains backdrop
-    createMountains();
+    // No background elements needed
+}
+
+// Create mountains backdrop
+function createMountains() {
+    // No mountains needed
 }
 
 // Create king (modified for flat terrain)
@@ -625,7 +628,7 @@ function createKing() {
     const kingGeometry = new THREE.SphereGeometry(1, 32, 32);
     const kingMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700 });
     kingMesh = new THREE.Mesh(kingGeometry, kingMaterial);
-    kingMesh.position.set(0, 0, 10); // Positioned at ground level
+    kingMesh.position.set(0, 1, 10); // Raised Y position to 1 to lift above ground
     kingMesh.castShadow = true;
     kingMesh.receiveShadow = true;
     
@@ -770,10 +773,21 @@ function generateTowerSlots() {
     slotPositions.forEach((position, index) => {
         // Create visual representation of the slot
         const slotGeometry = new THREE.BoxGeometry(1.5, 0.2, 1.5);
-        const slotMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+        const slotMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8b4513,
+            transparent: true,
+            opacity: 0.8
+        });
         const slotMesh = new THREE.Mesh(slotGeometry, slotMaterial);
         slotMesh.position.set(position.x, 0.1, position.z); // Positioned on the flat ground
         slotMesh.receiveShadow = true;
+        
+        // Make the slot interactive
+        slotMesh.userData = {
+            type: 'towerSlot',
+            index: index
+        };
+        
         scene.add(slotMesh);
         
         // Add to game state
@@ -957,7 +971,7 @@ function createProjectileMesh(color) {
     
     // Main projectile sphere
     const projectileGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-    const projectileMaterial = new THREE.MeshBasicMaterial({ 
+    const projectileMaterial = new THREE.MeshStandardMaterial({ 
         color: color,
         emissive: color,
         emissiveIntensity: 0.5
@@ -970,7 +984,7 @@ function createProjectileMesh(color) {
     if (color === 0x6495ED || color === 0x1E90FF) {
         // Larger glowing core for frost projectiles
         const coreGeometry = new THREE.SphereGeometry(0.15, 12, 12);
-        const coreMaterial = new THREE.MeshBasicMaterial({
+        const coreMaterial = new THREE.MeshStandardMaterial({
             color: 0xADD8E6,
             transparent: true,
             opacity: 0.7,
@@ -984,10 +998,12 @@ function createProjectileMesh(color) {
         
         // Add ice crystal shards around the projectile
         const shardGeometry = new THREE.ConeGeometry(0.05, 0.2, 4);
-        const shardMaterial = new THREE.MeshBasicMaterial({
+        const shardMaterial = new THREE.MeshStandardMaterial({
             color: 0xCCEEFF,
             transparent: true,
-            opacity: 0.9
+            opacity: 0.9,
+            emissive: 0xCCEEFF,
+            emissiveIntensity: 0.3
         });
         
         // Create multiple shards pointing outward
@@ -1011,10 +1027,12 @@ function createProjectileMesh(color) {
         
         // Add trailing ice particles
         const particleGeometry = new THREE.SphereGeometry(0.03, 4, 4);
-        const particleMaterial = new THREE.MeshBasicMaterial({
+        const particleMaterial = new THREE.MeshStandardMaterial({
             color: 0xCCEEFF,
             transparent: true,
-            opacity: 0.7
+            opacity: 0.7,
+            emissive: 0xCCEEFF,
+            emissiveIntensity: 0.2
         });
         
         // Add more particles for a better trail effect
@@ -1184,7 +1202,7 @@ function spawnCreepOnPath(pathIndex) {
         
         // Create 3D mesh with the appropriate type
         const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+        creepMesh.position.set(spawnPoint.x, 1, spawnPoint.z); // Raised Y position to 1
         scene.add(creepMesh);
         
         // Set type-specific properties
@@ -1220,7 +1238,7 @@ function spawnCreepOnPath(pathIndex) {
         // Add to game state
         const creep = {
             mesh: creepMesh,
-            position: { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z },
+            position: { x: spawnPoint.x, y: 1, z: spawnPoint.z }, // Raised Y position to 1
             progress: 0,
             health: health,
             maxHealth: health,
@@ -1533,18 +1551,19 @@ function updateCreeps(delta) {
             const newX = currentWaypoint.x + dx * creep.progress;
             const newZ = currentWaypoint.z + dz * creep.progress;
             
-            // Update position
+            // Update position while maintaining height
             creep.position.x = newX;
+            creep.position.y = 1; // Maintain raised height
             creep.position.z = newZ;
-            creep.mesh.position.set(newX, creep.position.y, newZ);
+            creep.mesh.position.set(newX, 1, newZ); // Maintain raised height
             
             // Update mesh rotation to face movement direction
             const angle = Math.atan2(dz, dx);
             creep.mesh.rotation.y = angle;
         }
         
-        // Apply bobbing animation
-        creep.mesh.position.y = creep.position.y + Math.sin(clock.elapsedTime * 5) * 0.1;
+        // Apply bobbing animation while maintaining base height
+        creep.mesh.position.y = 1 + Math.sin(clock.elapsedTime * 5) * 0.1;
         
         // Special animation for swarm type - rotate particles
         if (creep.creepType === 'swarm') {
@@ -2481,6 +2500,26 @@ function showGameOverScreen(victory) {
     gameOverElement.classList.remove('hidden');
 }
 
+// Setup tower selection event listeners
+function setupTowerSelectionListeners() {
+    // Get all tower options
+    const towerOptions = document.querySelectorAll('.tower-option');
+    
+    towerOptions.forEach(option => {
+        const towerType = option.getAttribute('data-type');
+        
+        // Remove any existing click listeners
+        option.removeEventListener('click', handleTowerOptionClick);
+        
+        // Add new click listener
+        option.addEventListener('click', function(e) {
+            e.stopPropagation();
+            console.log(`Tower option clicked: ${towerType}`);
+            handleTowerOptionClick(e, towerType);
+        });
+    });
+}
+
 // Modify the setupEventListeners function to use our new method
 function setupEventListeners() {
     // Canvas click event for tower placement and selection
@@ -2571,65 +2610,53 @@ function handleCanvasClick(event) {
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera({ x: mouseX, y: mouseY }, camera);
     
-    // Check if clicked on a tower
+    // First check for tower clicks
     const towerIntersects = raycaster.intersectObjects(scene.children, true);
     
-    // First, define a flag to track if we hit anything important
-    let hitSomething = false;
+    // Find which tower was clicked by checking the entire hierarchy
+    let clickedObject = towerIntersects[0]?.object;
+    let selectedTower = null;
     
-    if (towerIntersects.length > 0) {
-        // Find which tower was clicked by checking the entire hierarchy
-        let clickedObject = towerIntersects[0].object;
-        let selectedTower = null;
-        
-        // Traverse up to find parent that might be a tower
-        while (clickedObject && !selectedTower) {
-            // Check if this object is a tower mesh
-            for (let i = 0; i < gameState.towers.length; i++) {
-                if (gameState.towers[i].mesh === clickedObject) {
-                    selectedTower = gameState.towers[i];
-                    break;
-                }
-            }
-            
-            // Move up to parent if exists
-            clickedObject = clickedObject.parent;
-            // Break if we're at scene level
-            if (clickedObject === scene) break;
-        }
-        
-        if (selectedTower) {
-            // Remove any previous range indicators
-            clearAllRangeIndicators();
-            
-            selectTower(selectedTower);
-            hitSomething = true;
-            return;
-        }
-    }
-    
-    // Get all slot meshes
-    const slotMeshes = gameState.towerSlots.map(slot => slot.mesh);
-    const slotIntersects = raycaster.intersectObjects(slotMeshes);
-    
-    if (slotIntersects.length > 0) {
-        // Find which slot was clicked
-        for (let i = 0; i < gameState.towerSlots.length; i++) {
-            if (gameState.towerSlots[i].mesh === slotIntersects[0].object && !gameState.towerSlots[i].occupied) {
-                // Clear previous indicators first
-                clearAllRangeIndicators();
-                selectTowerSlot(gameState.towerSlots[i]);
-                hitSomething = true;
+    while (clickedObject && !selectedTower) {
+        // Check if this object is a tower mesh
+        for (let i = 0; i < gameState.towers.length; i++) {
+            if (gameState.towers[i].mesh === clickedObject) {
+                selectedTower = gameState.towers[i];
                 break;
             }
         }
+        
+        // Move up to parent if exists
+        clickedObject = clickedObject.parent;
+        // Break if we're at scene level
+        if (clickedObject === scene) break;
+    }
+    
+    if (selectedTower) {
+        // Remove any previous range indicators
+        clearAllRangeIndicators();
+        selectTower(selectedTower);
         return;
     }
     
-    // If we didn't hit anything important, clear all selections and indicators
-    if (!hitSomething) {
-        clearAllRangeIndicators();
+    // Then check for slot clicks
+    const slotIntersects = raycaster.intersectObjects(scene.children, true);
+    
+    for (const intersect of slotIntersects) {
+        const object = intersect.object;
+        if (object.userData && object.userData.type === 'towerSlot') {
+            const slot = gameState.towerSlots[object.userData.index];
+            if (!slot.occupied) {
+                // Clear previous indicators first
+                clearAllRangeIndicators();
+                selectTowerSlot(slot);
+                return;
+            }
+        }
     }
+    
+    // If we didn't hit anything important, clear all selections and indicators
+    clearAllRangeIndicators();
 }
 
 
@@ -2730,4 +2757,37 @@ if (!gameState.paths) {
             ]
         }
     ];
+}
+
+// Clear all range indicators
+function clearAllRangeIndicators() {
+    // Clear tower range indicators
+    if (gameState.selectedTower && gameState.selectedTower.rangeIndicator) {
+        scene.remove(gameState.selectedTower.rangeIndicator);
+        gameState.selectedTower.rangeIndicator = null;
+    }
+    
+    // Clear slot range indicator
+    if (gameState.towerSlotRangeIndicator) {
+        scene.remove(gameState.towerSlotRangeIndicator);
+        gameState.towerSlotRangeIndicator = null;
+    }
+}
+
+// Apply slow effect to a creep
+function applySlowEffect(creep, slowAmount, towerRank) {
+    // Add slow effect to creep's effects array
+    creep.slowEffects.push({
+        amount: slowAmount,
+        remainingTime: 2.0, // Slow effect lasts for 2 seconds
+        source: towerRank // Track which tower rank applied the slow
+    });
+    
+    // Update creep's speed
+    updateCreepSpeed(creep);
+    
+    // Add visual effect if not already present
+    if (!creep.slowEffectVisual) {
+        addSlowVisualEffect(creep);
+    }
 }
