@@ -2,7 +2,27 @@
 
 window.handleTowerOptionClick = function(event, towerType) {
     event.stopPropagation();
-    console.log("Tower option clicked directly:", towerType);
+    console.log("Tower option clicked:", towerType);
+    
+    if (!gameState.selectedTowerSlot) {
+        console.log("No tower slot selected");
+        return;
+    }
+    
+    // Check if we have enough gold
+    const towerData = gameState.towerTypes[towerType];
+    if (!towerData) {
+        console.error("Tower type not found:", towerType);
+        return;
+    }
+    
+    const towerCost = towerData.ranks[0].cost;
+    if (gameState.gold < towerCost) {
+        console.log("Not enough gold to build tower");
+        return;
+    }
+    
+    // Build the tower
     buildTower(towerType);
 };
 
@@ -26,6 +46,13 @@ window.buildTower = function(towerType) {
                 ranks: [
                     { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
                     { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
+                ]
+            },
+            fire: {
+                name: "Fire Tower",
+                ranks: [
+                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
+                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
                 ]
             }
         };
@@ -185,6 +212,13 @@ let gameState = {
             ranks: [
                 { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
                 { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
+            ]
+        },
+        fire: {
+            name: "Fire Tower",
+            ranks: [
+                { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
+                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
             ]
         }
     }
@@ -823,6 +857,8 @@ function createTowerMesh(towerType, rank) {
     let turretColor;
     if (towerType === 'frost') {
         turretColor = rank === 1 ? 0x4682B4 : 0x0000CD; // Darker blue for turret
+    } else if (towerType === 'fire') {
+        turretColor = rank === 1 ? 0x8B0000 : 0x800000; // Dark red for turret
     } else {
         turretColor = 0x333333; // Default dark gray for basic tower
     }
@@ -845,6 +881,44 @@ function createTowerMesh(towerType, rank) {
         const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
         orbMesh.position.set(0, 0, 0.5); // Position at end of turret
         turretMesh.add(orbMesh);
+    } else if (towerType === 'fire') {
+        // Add a glowing fire orb at the end of the turret
+        const orbGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+        const orbMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff4500,
+            emissive: 0xff4500,
+            emissiveIntensity: 0.8
+        });
+        const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
+        orbMesh.position.set(0, 0, 0.5); // Position at end of turret
+        turretMesh.add(orbMesh);
+        
+        // Add fire particles
+        const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+        const particleMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff8c00,
+            emissive: 0xff8c00,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 0.8
+        });
+        
+        // Create multiple particles
+        for (let i = 0; i < 6; i++) {
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            const angle = (i / 6) * Math.PI * 2;
+            particle.position.set(
+                Math.cos(angle) * 0.2,
+                Math.sin(angle) * 0.2,
+                0.5
+            );
+            particle.userData = {
+                originalPos: particle.position.clone(),
+                speed: Math.random() * 0.5 + 0.5,
+                angle: angle
+            };
+            turretMesh.add(particle);
+        }
     }
     
     return towerMesh;
@@ -1024,19 +1098,33 @@ function createProjectileMesh(color) {
             
             projectileGroup.add(shard);
         }
-        
-        // Add trailing ice particles
-        const particleGeometry = new THREE.SphereGeometry(0.03, 4, 4);
-        const particleMaterial = new THREE.MeshStandardMaterial({
-            color: 0xCCEEFF,
+    } else if (color === 0xff4500 || color === 0xff0000) {
+        // Fire projectile effects
+        const coreGeometry = new THREE.SphereGeometry(0.15, 12, 12);
+        const coreMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff8c00,
             transparent: true,
             opacity: 0.7,
-            emissive: 0xCCEEFF,
-            emissiveIntensity: 0.2
+            emissive: 0xff8c00,
+            emissiveIntensity: 0.8
+        });
+        
+        const coreEffect = new THREE.Mesh(coreGeometry, coreMaterial);
+        coreEffect.scale.set(0.8, 0.8, 0.8);
+        projectileGroup.add(coreEffect);
+        
+        // Add fire particles
+        const particleGeometry = new THREE.SphereGeometry(0.03, 4, 4);
+        const particleMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff4500,
+            transparent: true,
+            opacity: 0.8,
+            emissive: 0xff4500,
+            emissiveIntensity: 0.6
         });
         
         // Add more particles for a better trail effect
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i < 8; i++) {
             const particle = new THREE.Mesh(particleGeometry, particleMaterial);
             // Position behind the main projectile in a random pattern
             particle.position.set(
@@ -1079,6 +1167,7 @@ function animate() {
         updateTowers(safeDelta);
         updateCreeps(safeDelta);
         updateProjectiles(safeDelta);
+        updateCriticalHitParticles(safeDelta);
     }
     
     // Always render the scene (even when paused)
@@ -1835,6 +1924,13 @@ function buildTower(towerType) {
                     { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
                     { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
                 ]
+            },
+            fire: {
+                name: "Fire Tower",
+                ranks: [
+                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
+                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
+                ]
             }
         };
     }
@@ -1962,7 +2058,7 @@ function updateTowers(delta) {
     });
 }
 
-// 5. Fire projectile with proper color and slowEffect for frost towers
+// 5. Fire projectile with proper color and effects
 function fireProjectile(tower, target) {
     // Determine projectile color based on tower type and rank
     let projectileColor;
@@ -1970,6 +2066,9 @@ function fireProjectile(tower, target) {
     if (tower.type === 'frost') {
         // Frost tower has blue projectiles
         projectileColor = tower.rank === 1 ? 0x6495ED : 0x1E90FF;
+    } else if (tower.type === 'fire') {
+        // Fire tower has red projectiles
+        projectileColor = tower.rank === 1 ? 0xff4500 : 0xff0000;
     } else {
         // Basic tower has gray projectiles
         projectileColor = tower.rank === 1 ? 0xaaaaaa : 0xdddddd;
@@ -2000,7 +2099,9 @@ function fireProjectile(tower, target) {
         damage: tower.damage,
         type: tower.type,
         towerRank: tower.rank,
-        slowEffect: tower.type === 'frost' ? tower.slowEffect : 0, // Add slowing effect for frost towers
+        slowEffect: tower.type === 'frost' ? tower.slowEffect : 0,
+        critChance: tower.type === 'fire' ? tower.critChance : 0,
+        critMultiplier: tower.type === 'fire' ? tower.critMultiplier : 1,
         reached: false
     };
     
@@ -2060,6 +2161,14 @@ function updateProjectiles(delta) {
                     gameState.activeAnimations = [];
                 }
                 gameState.activeAnimations.push(impactAnimation);
+            }
+            
+            // Handle critical strike for Fire Tower
+            if (projectile.type === 'fire' && Math.random() < projectile.critChance) {
+                const critDamage = projectile.damage * projectile.critMultiplier;
+                projectile.target.health -= critDamage;
+                gameState.totalDamage += critDamage;
+                createCriticalHitEffect(projectile.position);
             }
             
             // Mark for removal
@@ -2542,21 +2651,19 @@ function showGameOverScreen(victory) {
 
 // Setup tower selection event listeners
 function setupTowerSelectionListeners() {
-    // Get all tower options
+    // Remove any existing event listeners
     const towerOptions = document.querySelectorAll('.tower-option');
-    
     towerOptions.forEach(option => {
-        const towerType = option.getAttribute('data-type');
+        // Remove any existing onclick handlers
+        option.onclick = null;
         
-        // Remove any existing click listeners
-        option.removeEventListener('click', handleTowerOptionClick);
-        
-        // Add new click listener
-        option.addEventListener('click', function(e) {
+        // Add new onclick handler
+        option.onclick = function(e) {
             e.stopPropagation();
-            console.log(`Tower option clicked: ${towerType}`);
+            const towerType = this.getAttribute('data-type');
+            console.log("Tower option clicked:", towerType);
             handleTowerOptionClick(e, towerType);
-        });
+        };
     });
 }
 
@@ -2636,6 +2743,12 @@ function setupEventListeners() {
 function handleTowerOptionClick(event, towerType) {
     event.stopPropagation();
     console.log("Tower option clicked directly:", towerType);
+    
+    if (!gameState.selectedTowerSlot) {
+        console.log("No tower slot selected");
+        return;
+    }
+    
     buildTower(towerType);
 }
 
@@ -2731,10 +2844,8 @@ function selectTowerSlot(slot) {
     // Update tower options based on available gold
     updateTowerOptionsAvailability();
     
-    // Setup tower selection listeners again to ensure they work
-    setTimeout(() => {
-        setupTowerSelectionListeners();
-    }, 10);
+    // Setup tower selection listeners
+    setupTowerSelectionListeners();
 
     // Add document click handler to close modal when clicking outside
     const closeModalHandler = function(event) {
@@ -2760,13 +2871,13 @@ function selectTowerSlot(slot) {
             
             // Reset selection
             gameState.selectedTowerSlot = null;
-            
-            // Remove this event listener
-            document.removeEventListener('click', closeModalHandler);
+            gameState.selectedTower = null;
         }
     };
     
-    // Add the event listener
+    // Remove any existing click handler
+    document.removeEventListener('click', closeModalHandler);
+    // Add new click handler
     document.addEventListener('click', closeModalHandler);
 }
 
@@ -2865,5 +2976,70 @@ function applySlowEffect(creep, slowAmount, towerRank) {
     // Add visual effect if not already present
     if (!creep.slowEffectVisual) {
         addSlowVisualEffect(creep);
+    }
+}
+
+// Add critical hit effect function
+function createCriticalHitEffect(position) {
+    const particleCount = 12;
+    const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+    const particleMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8,
+        emissive: 0xff0000,
+        emissiveIntensity: 0.6
+    });
+    
+    const particles = [];
+    
+    for (let i = 0; i < particleCount; i++) {
+        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        particle.position.copy(position);
+        scene.add(particle);
+        
+        const angle = (i / particleCount) * Math.PI * 2;
+        const speed = 2 + Math.random();
+        const direction = {
+            x: Math.cos(angle) * speed,
+            y: Math.random() * speed,
+            z: Math.sin(angle) * speed
+        };
+        
+        particles.push({
+            mesh: particle,
+            direction: direction,
+            life: 1.0
+        });
+    }
+    
+    // Store particles for animation
+    if (!gameState.criticalHitParticles) {
+        gameState.criticalHitParticles = [];
+    }
+    gameState.criticalHitParticles.push(...particles);
+}
+
+// Update critical hit particles
+function updateCriticalHitParticles(delta) {
+    if (!gameState.criticalHitParticles) return;
+    
+    for (let i = gameState.criticalHitParticles.length - 1; i >= 0; i--) {
+        const particle = gameState.criticalHitParticles[i];
+        
+        // Update position
+        particle.mesh.position.x += particle.direction.x;
+        particle.mesh.position.y += particle.direction.y;
+        particle.mesh.position.z += particle.direction.z;
+        
+        // Update life and fade out
+        particle.life -= delta;
+        particle.mesh.material.opacity = particle.life;
+        
+        // Remove dead particles
+        if (particle.life <= 0) {
+            scene.remove(particle.mesh);
+            gameState.criticalHitParticles.splice(i, 1);
+        }
     }
 }

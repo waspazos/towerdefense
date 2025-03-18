@@ -103,7 +103,7 @@ body {
 }
 
 .tower-option:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.2);
 }
 
 .tower-icon {
@@ -113,7 +113,40 @@ body {
     border-radius: 50%;
 }
 
-.basic-tower {
+.tower-icon.fire-tower {
+    background: linear-gradient(135deg, #ff4500, #ff0000);
+    box-shadow: 0 0 15px rgba(255, 69, 0, 0.5);
+}
+
+.tower-icon.fire-tower::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, #ff8c00, transparent 70%);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.6;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+}
+
+.tower-icon.basic-tower {
     background-color: #aaa;
 }
 
