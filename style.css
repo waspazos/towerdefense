@@ -77,6 +77,16 @@ body {
 }
 
 /* Fixed bottom center panel for tower selection */
+#tower-selection-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 2;
+}
+
 #tower-selection {
     position: fixed;
     left: 50%;
@@ -85,12 +95,19 @@ body {
     background-color: rgba(0, 0, 0, 0.8);
     padding: 20px;
     border-radius: 10px;
+    z-index: 3;
+    color: white;
+    width: 600px;
     display: flex;
     gap: 15px;
-    z-index: 3;
-    width: 600px;
     justify-content: center;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.tower-options {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
 }
 
 .tower-option {

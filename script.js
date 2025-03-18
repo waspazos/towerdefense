@@ -2856,9 +2856,9 @@ function selectTowerSlot(slot) {
     // Hide tower actions
     document.getElementById('tower-actions').classList.add('hidden');
     
-    // Show tower selection menu
-    const towerSelection = document.getElementById('tower-selection');
-    towerSelection.classList.remove('hidden');
+    // Show backdrop and tower selection menu
+    document.getElementById('tower-selection-backdrop').classList.remove('hidden');
+    document.getElementById('tower-selection').classList.remove('hidden');
     
     // Update tower options based on available gold
     updateTowerOptionsAvailability();
@@ -2866,18 +2866,15 @@ function selectTowerSlot(slot) {
     // Setup tower selection listeners
     setupTowerSelectionListeners();
 
-    // Add document click handler to close modal when clicking outside
-    const closeModalHandler = function(event) {
-        // Don't close if clicking on the canvas
-        if (event.target === renderer.domElement) {
-            return;
-        }
-        
-        const towerSelection = document.getElementById('tower-selection');
-        const towerActions = document.getElementById('tower-actions');
-        
-        // Check if click is outside both menus
-        if (!towerSelection.contains(event.target) && !towerActions.contains(event.target)) {
+    // Remove any existing click handler
+    if (gameState.modalCloseHandler) {
+        document.getElementById('tower-selection-backdrop').removeEventListener('click', gameState.modalCloseHandler);
+    }
+
+    // Create new click handler for the backdrop
+    gameState.modalCloseHandler = function(event) {
+        // Only handle clicks directly on the backdrop
+        if (event.target === document.getElementById('tower-selection-backdrop')) {
             // Clear range indicator
             if (gameState.towerSlotRangeIndicator) {
                 scene.remove(gameState.towerSlotRangeIndicator);
@@ -2885,19 +2882,22 @@ function selectTowerSlot(slot) {
             }
             
             // Hide menus
-            towerSelection.classList.add('hidden');
-            towerActions.classList.add('hidden');
+            document.getElementById('tower-selection-backdrop').classList.add('hidden');
+            document.getElementById('tower-selection').classList.add('hidden');
+            document.getElementById('tower-actions').classList.add('hidden');
             
             // Reset selection
             gameState.selectedTowerSlot = null;
             gameState.selectedTower = null;
+            
+            // Remove the click handler
+            document.getElementById('tower-selection-backdrop').removeEventListener('click', gameState.modalCloseHandler);
+            gameState.modalCloseHandler = null;
         }
     };
     
-    // Remove any existing click handler
-    document.removeEventListener('click', closeModalHandler);
-    // Add new click handler
-    document.addEventListener('click', closeModalHandler);
+    // Add click handler to the backdrop
+    document.getElementById('tower-selection-backdrop').addEventListener('click', gameState.modalCloseHandler);
 }
 
 // Handle window resize
