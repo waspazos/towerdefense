@@ -1916,16 +1916,17 @@ function updateTowers(delta) {
             tower.attackCooldown -= delta;
         }
         
-        // Find target if needed
-        if (!tower.targetCreep || tower.targetCreep.health <= 0 || tower.targetCreep.reachedKing || 
-            getDistance3D(tower.position, tower.targetCreep.position) > tower.range) {
+        // Find targets if needed
+        if (!tower.targetCreep || tower.targetCreep.length === 0 || 
+            tower.targetCreep.some(target => target.health <= 0 || target.reachedKing) || 
+            tower.targetCreep.some(target => getDistance3D(tower.position, target.position) > tower.range)) {
             tower.targetCreep = findTarget(tower);
         }
         
-        // Face the turret towards the target
-        if (tower.targetCreep) {
+        // Face the turret towards the first target
+        if (tower.targetCreep && tower.targetCreep.length > 0) {
             const turret = tower.mesh.children[0];
-            const targetPos = tower.targetCreep.position;
+            const targetPos = tower.targetCreep[0].position;
             
             // Calculate direction to target
             const dx = targetPos.x - tower.position.x;
@@ -1936,10 +1937,24 @@ function updateTowers(delta) {
             tower.mesh.rotation.y = angle + Math.PI / 2;
         }
         
-        // Attack if ready and has target
-        if (tower.attackCooldown <= 0 && tower.targetCreep) {
-            // Create projectile
-            fireProjectile(tower, tower.targetCreep);
+        // Attack if ready and has targets
+        if (tower.attackCooldown <= 0 && tower.targetCreep && tower.targetCreep.length > 0) {
+            console.log("Tower firing:", tower.type, "Targets:", tower.targetCreep.length); // Debug log
+            
+            // For basic towers, always fire at least one projectile
+            if (tower.type === 'basic') {
+                // Fire at first target
+                fireProjectile(tower, tower.targetCreep[0]);
+                
+                // If there's a second target, fire at it too
+                if (tower.targetCreep.length > 1) {
+                    console.log("Firing second projectile"); // Debug log
+                    fireProjectile(tower, tower.targetCreep[1]);
+                }
+            } else {
+                // For other towers, fire at single target
+                fireProjectile(tower, tower.targetCreep[0]);
+            }
             
             // Reset cooldown
             tower.attackCooldown = tower.attackSpeed;
@@ -1962,14 +1977,24 @@ function fireProjectile(tower, target) {
     
     // Create projectile mesh
     const projectileMesh = createProjectileMesh(projectileColor);
+    
+    // Offset the projectile position slightly for multiple targets
+    const offset = Math.random() * 0.2 - 0.1; // Random offset between -0.1 and 0.1
     projectileMesh.position.copy(tower.position);
     projectileMesh.position.y += 0.5; // Start at turret height
+    projectileMesh.position.x += offset; // Add random offset
+    projectileMesh.position.z += offset; // Add random offset
+    
     scene.add(projectileMesh);
     
     // Create projectile object
     const projectile = {
         mesh: projectileMesh,
-        position: { ...tower.position, y: tower.position.y + 0.5 },
+        position: { 
+            x: projectileMesh.position.x,
+            y: projectileMesh.position.y,
+            z: projectileMesh.position.z
+        },
         target: target,
         speed: 15, // Units per second
         damage: tower.damage,
@@ -2099,17 +2124,32 @@ function findTarget(tower) {
         .filter(creep => !creep.reachedKing && creep.health > 0)
         .sort((a, b) => b.progress - a.progress);
     
-    // Find closest creep within range
+    // For basic towers, find up to 2 targets
+    if (tower.type === 'basic') {
+        const targets = [];
+        for (let i = 0; i < sortedCreeps.length && targets.length < 2; i++) {
+            const creep = sortedCreeps[i];
+            const distance = getDistance3D(tower.position, creep.position);
+            
+            if (distance <= tower.range) {
+                targets.push(creep);
+            }
+        }
+        console.log("Basic tower found targets:", targets.length); // Debug log
+        return targets;
+    }
+    
+    // For other towers, find single target
     for (let i = 0; i < sortedCreeps.length; i++) {
         const creep = sortedCreeps[i];
         const distance = getDistance3D(tower.position, creep.position);
         
         if (distance <= tower.range) {
-            return creep;
+            return [creep]; // Return as array for consistency
         }
     }
     
-    return null;
+    return [];
 }
 
 // Calculate 3D distance between two points
@@ -2601,6 +2641,9 @@ function handleTowerOptionClick(event, towerType) {
 
 // Handle canvas click
 function handleCanvasClick(event) {
+    // Stop event from bubbling up to document
+    event.stopPropagation();
+    
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     const rect = renderer.domElement.getBoundingClientRect();
     const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2692,6 +2735,39 @@ function selectTowerSlot(slot) {
     setTimeout(() => {
         setupTowerSelectionListeners();
     }, 10);
+
+    // Add document click handler to close modal when clicking outside
+    const closeModalHandler = function(event) {
+        // Don't close if clicking on the canvas
+        if (event.target === renderer.domElement) {
+            return;
+        }
+        
+        const towerSelection = document.getElementById('tower-selection');
+        const towerActions = document.getElementById('tower-actions');
+        
+        // Check if click is outside both menus
+        if (!towerSelection.contains(event.target) && !towerActions.contains(event.target)) {
+            // Clear range indicator
+            if (gameState.towerSlotRangeIndicator) {
+                scene.remove(gameState.towerSlotRangeIndicator);
+                gameState.towerSlotRangeIndicator = null;
+            }
+            
+            // Hide menus
+            towerSelection.classList.add('hidden');
+            towerActions.classList.add('hidden');
+            
+            // Reset selection
+            gameState.selectedTowerSlot = null;
+            
+            // Remove this event listener
+            document.removeEventListener('click', closeModalHandler);
+        }
+    };
+    
+    // Add the event listener
+    document.addEventListener('click', closeModalHandler);
 }
 
 // Handle window resize
