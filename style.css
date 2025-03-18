@@ -1,0 +1,390 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background-color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    background-color: #444;
+}
+
+#canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#game-ui {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    padding: 10px;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-bottom-left-radius: 10px;
+    user-select: none;
+}
+
+#game-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 5px;
+}
+
+.stat-label {
+    font-weight: bold;
+    margin-right: 5px;
+}
+
+#round-info {
+    text-align: center;
+    padding: 5px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#round-counter {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+#round-timer {
+    margin-top: 5px;
+    color: #ffd700;
+}
+
+/* Fixed bottom center panel for tower selection */
+#tower-selection {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 15px;
+    border-radius: 10px;
+    display: flex;
+    gap: 20px;
+    z-index: 3;
+    width: 500px;
+    justify-content: center;
+}
+
+.tower-option {
+    padding: 10px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    width: 190px;
+}
+
+.tower-option:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.tower-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto;
+    border-radius: 50%;
+}
+
+.basic-tower {
+    background-color: #aaa;
+}
+
+.frost-tower {
+    background-color: #6495ED;
+}
+
+.tower-info {
+    margin-top: 5px;
+    color: white;
+    font-size: 0.8em;
+}
+
+.tower-name {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.tower-cost {
+    color: #ffd700;
+}
+
+/* Tower actions panel (fixed to bottom center) */
+#tower-actions {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 9px;
+    border-radius: 8px;
+    z-index: 3;
+    color: white;
+    width: 260px;
+}
+
+#tower-details {
+    display: flex;
+    align-items: center;
+    margin-bottom: 7px;
+}
+
+#tower-details-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+#tower-details-info {
+    font-size: 0.8em;
+}
+
+#tower-details-name {
+    font-weight: bold;
+    font-size: 1em;
+    margin-bottom: 3px;
+}
+
+#tower-details-damage, #tower-details-speed, #tower-details-rank, #tower-details-special {
+    font-size: 0.85em;
+    margin-bottom: 1px;
+}
+
+#tower-details-special {
+    color: #add8e6; /* Light blue for frost effect */
+}
+
+#tower-actions-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+#tower-actions-buttons button {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: bold;
+    font-size: 0.65em;
+    min-width: 75px;
+}
+
+#upgrade-tower {
+    background-color: #4caf50;
+    color: white;
+}
+
+#upgrade-tower:hover {
+    background-color: #388e3c;
+}
+
+#sell-tower {
+    background-color: #f44336;
+    color: white;
+}
+
+#sell-tower:hover {
+    background-color: #d32f2f;
+}
+
+#cancel-tower-action {
+    background-color: #9e9e9e;
+    color: white;
+}
+
+#cancel-tower-action:hover {
+    background-color: #757575;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+.modal-content {
+    background-color: #333;
+    padding: 20px;
+    border-radius: 10px;
+    color: white;
+    text-align: center;
+    width: 400px;
+}
+
+#game-result-title {
+    font-size: 1.8em;
+    margin-bottom: 10px;
+}
+
+#game-stats-summary {
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#restart-game {
+    padding: 10px 20px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.2em;
+}
+
+#restart-game:hover {
+    background-color: #388e3c;
+}
+
+/* ESC Menu styles */
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.menu-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.2em;
+    transition: background-color 0.2s;
+}
+
+#resume-game {
+    background-color: #4caf50;
+    color: white;
+}
+
+#resume-game:hover {
+    background-color: #388e3c;
+}
+
+#restart-from-pause {
+    background-color: #f44336;
+    color: white;
+}
+
+#restart-from-pause:hover {
+    background-color: #d32f2f;
+}
+
+/* Round Tracker Styles */
+#round-tracker {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    padding: 12px;
+    color: white;
+    user-select: none;
+    z-index: 3;
+    width: 250px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.3s ease;
+}
+
+.round-tracker-header {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 5px;
+}
+
+.round-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.round-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+    /* No highlighting for non-active rounds */
+    opacity: 0.7;
+    border-left: none;
+}
+
+/* Current round highlighting */
+.round-item.active {
+    background-color: rgba(76, 175, 80, 0.3); /* Green background */
+    border-left: 3px solid #4CAF50; /* Green border */
+    opacity: 1;
+}
+
+/* Remove specific styling for other states */
+.round-item.previous,
+.round-item.next,
+.round-item.future {
+    /* Remove any special styling */
+    background-color: rgba(255, 255, 255, 0.1);
+    opacity: 0.7;
+    border-left: none;
+}
+
+/* When a round is active, keep its details visible */
+.round-item.active .round-details {
+    color: #fff; /* Make text fully visible */
+}
+
+.round-number {
+    font-weight: bold;
+}
+
+.round-details {
+    font-size: 0.8em;
+    color: #ccc;
+}
