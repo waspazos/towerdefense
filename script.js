@@ -583,7 +583,7 @@ function updateRoundTracker() {
     const futureRound = currentRound + 2;
     
     // Update previous round
-    if (previousRound >= 1) {
+    if (previousRound >= 0) {
         document.getElementById('previous-round').textContent = previousRound;
         const prevRoundDef = gameState.roundDefinitions[previousRound - 1];
         document.getElementById('previous-round-details').textContent = prevRoundDef.type.charAt(0).toUpperCase() + prevRoundDef.type.slice(1);
@@ -594,7 +594,7 @@ function updateRoundTracker() {
     
     // Update current round
     document.getElementById('current-round').textContent = currentRound;
-    if (currentRound > 0 && currentRound <= gameState.maxRounds) {
+    if (currentRound >= 1 && currentRound <= gameState.maxRounds) {
         const currRoundDef = gameState.roundDefinitions[currentRound - 1];
         document.getElementById('current-round-details').textContent = currRoundDef.type.charAt(0).toUpperCase() + currRoundDef.type.slice(1);
     } else {
@@ -625,7 +625,7 @@ function updateRoundTracker() {
     document.querySelectorAll('.round-item').forEach(item => item.classList.remove('active'));
     
     // Only highlight current round when game has started
-    if (currentRound > 0) {
+    if (currentRound >= 1) {
         document.querySelector('.round-item.current').classList.add('active');
     }
 }
@@ -1531,9 +1531,13 @@ function spawnCreepOnPath(pathIndex) {
             return;
         }
 
-        // Get the current round definition
+        // Get the current round definition (using current round index - 1 since we increment at end of startRound)
         const roundIndex = gameState.currentRound - 1;
         const roundDef = gameState.roundDefinitions[roundIndex];
+        if (!roundDef) {
+            console.error("Invalid round definition for round:", gameState.currentRound);
+            return;
+        }
         const creepType = roundDef.type;
 
         // Create creep mesh with the correct type
@@ -1579,32 +1583,26 @@ function spawnCreepOnPath(pathIndex) {
             health = Math.round(health * difficultyMultiplier);
         }
         
-        // Create creep object with type-specific properties
+        // Create creep object
         const creep = {
             mesh: creepMesh,
-            position: { 
-                x: path.spawnPoint.x,
-                y: 0.5,
-                z: path.spawnPoint.z
-            },
-            progress: 0,
+            path: path,
+            currentWaypoint: 0,
             health: health,
             maxHealth: health,
+            damageToKing: damage,
             baseSpeed: speed,
             speed: speed,
-            slowEffects: [],
+            type: creepType,
             effects: {
                 slow: [],
                 burn: null
             },
+            slowEffects: [],
             reachedKing: false,
-            damageToKing: damage,
-            creepType: creepType,
-            pathIndex: pathIndex,
-            path: path,
-            currentWaypoint: 0
+            position: new THREE.Vector3(path.spawnPoint.x, 0.5, path.spawnPoint.z)
         };
-
+        
         // Add health bar
         const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
@@ -1633,12 +1631,13 @@ function spawnCreepOnPath(pathIndex) {
             this.rotation.x = 0;
             this.rotation.z = 0;
         };
-
+        
         // Add to game state
         gameState.creeps.push(creep);
-        console.log("Creep spawned successfully. Total creeps:", gameState.creeps.length);
+        
+        console.log(`Spawned ${creepType} creep with ${health} health for round ${gameState.currentRound + 1}`);
     } catch (error) {
-        console.error("Error spawning creep on path:", error);
+        console.error("Error spawning creep:", error);
     }
 }
 
@@ -1853,7 +1852,20 @@ function updateCreepSpeed(creep) {
 // Update creeps
 function updateCreeps(delta) {
     // Skip update if no creeps
-    if (gameState.creeps.length === 0) return;
+    if (gameState.creeps.length === 0) {
+        // Add debug logging for round end conditions
+        if (gameState.roundActive) {
+            console.log("Round end check - Active creeps:", gameState.creeps.length, 
+                       "Creeps to spawn:", gameState.creepsToSpawn, 
+                       "Round active:", gameState.roundActive);
+            // Check for round end when no creeps are present
+            if (gameState.creepsToSpawn === 0) {
+                console.log("No creeps and no more to spawn, ending round");
+                endRound();
+            }
+        }
+        return;
+    }
 
     // Update burn effects
     for (let i = gameState.creeps.length - 1; i >= 0; i--) {
@@ -1868,6 +1880,13 @@ function updateCreeps(delta) {
                 // Remove creep from scene and game state
                 scene.remove(creep.mesh);
                 gameState.creeps.splice(i, 1);
+                
+                // Check for round end after creep death
+                if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
+                    console.log("Round end triggered by creep death");
+                    endRound();
+                    return;
+                }
             }
         }
     }
@@ -1910,8 +1929,9 @@ function updateCreeps(delta) {
             
             // Check if round should end
             if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
-                console.log("All creeps killed or reached king, ending round");
+                console.log("Round end triggered by creep reaching king");
                 endRound();
+                return;
             }
             continue;
         }
@@ -1929,68 +1949,31 @@ function updateCreeps(delta) {
         // Calculate the ratio of movement
         const ratio = moveDistance / distance;
         
-        // Apply movement using the ratio
+        // Move the creep
         creep.mesh.position.x += dx * ratio;
-        creep.mesh.position.y = 0.5; // Keep constant height
         creep.mesh.position.z += dz * ratio;
-
-        // Update creep's position property to match mesh
-        creep.position.x = creep.mesh.position.x;
-        creep.position.y = creep.mesh.position.y;
-        creep.position.z = creep.mesh.position.z;
-
-        // Calculate the angle the creep should face
-        const angle = Math.atan2(dx, dz);
-        creep.mesh.rotation.y = angle;
-
-        // Check if reached waypoint using the same distance calculation
+        
+        // Update creep's position vector
+        creep.position.copy(creep.mesh.position);
+        
+        // Update health bar position
+        if (creep.healthBar) {
+            creep.healthBar.update();
+        }
+        
+        // Check if we've reached the next waypoint
         if (distance < 0.1) {
-            // Snap to waypoint position to prevent drift
-            creep.mesh.position.set(nextWaypoint.x, 0.5, nextWaypoint.z);
-            creep.position.x = nextWaypoint.x;
-            creep.position.y = 0.5;
-            creep.position.z = nextWaypoint.z;
-            
-            // Move to next waypoint
             creep.currentWaypoint++;
-            
-            // Debug logging
-            console.log(`Creep ${i} reached waypoint ${creep.currentWaypoint - 1}, moving to next`);
         }
-
-        // Update creep's progress along the path
-        let totalPathLength = 0;
-        for (let j = 0; j < creep.path.waypoints.length - 1; j++) {
-            const wp1 = creep.path.waypoints[j];
-            const wp2 = creep.path.waypoints[j + 1];
-            const dx = wp2.x - wp1.x;
-            const dz = wp2.z - wp1.z;
-            totalPathLength += Math.sqrt(dx * dx + dz * dz);
-        }
-
-        let distanceTraveled = 0;
-        // Add up distances to completed waypoints
-        for (let j = 0; j < creep.currentWaypoint; j++) {
-            const wp1 = creep.path.waypoints[j];
-            const wp2 = creep.path.waypoints[j + 1];
-            const dx = wp2.x - wp1.x;
-            const dz = wp2.z - wp1.z;
-            distanceTraveled += Math.sqrt(dx * dx + dz * dz);
-        }
-        // Add distance to current waypoint
-        const currentDx = creep.mesh.position.x - currentWaypoint.x;
-        const currentDz = creep.mesh.position.z - currentWaypoint.z;
-        distanceTraveled += Math.sqrt(currentDx * currentDx + currentDz * currentDz);
-
-        creep.progress = distanceTraveled / totalPathLength;
     }
 
-    // Check if round should end (all creeps killed and all creeps spawned)
+    // Final round end check
     if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
-        console.log("All creeps killed and spawned, ending round");
+        console.log("Round end triggered by final check");
         endRound();
     }
 }
+
 // Clean up all game objects and restart the game
 function cleanupAndRestartGame() {
     console.log("Performing complete game cleanup and restart");
@@ -2490,35 +2473,16 @@ function getDistance3D(point1, point2) {
 }
 
 function startRound() {
-    console.log("Starting round", gameState.currentRound + 1);
+    // Increment round counter at the start
+    gameState.currentRound++;
     
-    // Reset round-specific augments
-    resetRoundAugments();
-    
-    // Get current round definition before incrementing
-    const currentRoundDef = gameState.roundDefinitions[gameState.currentRound];
+    // Get current round definition (using 0-based index)
+    const roundIndex = gameState.currentRound - 1;
+    const currentRoundDef = gameState.roundDefinitions[roundIndex];
     if (!currentRoundDef) {
         console.error("Invalid round definition for round:", gameState.currentRound);
         return;
     }
-    
-    // Increment round counter
-    gameState.currentRound++;
-    
-    // Check for game over
-    if (gameState.currentRound > gameState.maxRounds) {
-        showGameOverScreen(true);
-        return;
-    }
-    
-    // Update round tracker
-    updateRoundTracker();
-    
-    // Calculate number of creeps to spawn
-    const baseCreeps = 5;
-    const roundBonus = Math.min(gameState.currentRound, 10);
-    gameState.creepsToSpawn = baseCreeps + roundBonus;
-    console.log("Creeps to spawn:", gameState.creepsToSpawn);
     
     // Set round as active
     gameState.roundActive = true;
@@ -2529,6 +2493,12 @@ function startRound() {
         clearInterval(gameState.timerInterval);
         gameState.timerInterval = null;
     }
+    
+    // Calculate number of creeps to spawn
+    const baseCreeps = 5;
+    const roundBonus = Math.min(gameState.currentRound, 10);
+    gameState.creepsToSpawn = baseCreeps + roundBonus;
+    console.log("Creeps to spawn:", gameState.creepsToSpawn);
     
     // Spawn creeps with delay
     let spawnCount = 0;
@@ -2549,10 +2519,20 @@ function startRound() {
     // Start round timer
     gameState.roundTimer = 0;
     updateRoundTimer();
+    
+    // Check for game over
+    if (gameState.currentRound > gameState.maxRounds) {
+        showGameOverScreen(true);
+        return;
+    }
+    
+    // Update round tracker and counter
+    updateRoundTracker();
+    updateRoundCounter();
 }
 
 function endRound() {
-    console.log("Ending round", gameState.currentRound);
+    console.log("Ending round", gameState.currentRound + 1);
     
     // Clear any existing timer
     if (gameState.timerInterval) {
@@ -2591,6 +2571,7 @@ function startInterRoundTimer() {
             
             // When timer reaches 0, start next round
             if (gameState.interRoundTimer <= 0) {
+                console.log("Inter-round timer finished, starting next round");
                 clearInterval(gameState.timerInterval);
                 gameState.timerInterval = null;
                 startRound();
@@ -2823,6 +2804,7 @@ function updateTotalDamage() {
 }
 
 function updateRoundCounter() {
+    // Show the actual round number (no need to add 1 since we increment at start of startRound)
     document.getElementById('round-counter').textContent = `Round: ${gameState.currentRound}/${gameState.maxRounds}`;
 }
 
