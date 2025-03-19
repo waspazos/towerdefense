@@ -314,33 +314,33 @@ function initGame() {
     gameState.paths = [
         // Left path
         { 
-            spawnPoint: new THREE.Vector3(-15, 0, -25),
+            spawnPoint: new THREE.Vector3(-15, 0, -20),
             waypoints: [
-                new THREE.Vector3(-15, 0, -25),
-                new THREE.Vector3(-15, 0, -10),
+                new THREE.Vector3(-15, 0, -17.5),
+                new THREE.Vector3(-15, 0, -7.5),
                 new THREE.Vector3(-15, 0, 0),
-                new THREE.Vector3(-10, 0, 5),
-                new THREE.Vector3(-5, 0, 7),
+                new THREE.Vector3(-10, 0, 7.5),
                 new THREE.Vector3(0, 0, 10)
             ]
         },
         // Center path
         {
-            spawnPoint: new THREE.Vector3(0, 0, -25),
+            spawnPoint: new THREE.Vector3(0, 0, -20),
             waypoints: [
-                new THREE.Vector3(0, 0, -25),
+                new THREE.Vector3(0, 0, -17.5),
+                new THREE.Vector3(0, 0, -7.5),
+                new THREE.Vector3(0, 0, 0),
                 new THREE.Vector3(0, 0, 10)
             ]
         },
         // Right path
         {
-            spawnPoint: new THREE.Vector3(15, 0, -25),
+            spawnPoint: new THREE.Vector3(15, 0, -20),
             waypoints: [
-                new THREE.Vector3(15, 0, -25),
-                new THREE.Vector3(15, 0, -10),
+                new THREE.Vector3(15, 0, -17.5),
+                new THREE.Vector3(15, 0, -7.5),
                 new THREE.Vector3(15, 0, 0),
-                new THREE.Vector3(10, 0, 5),
-                new THREE.Vector3(5, 0, 7),
+                new THREE.Vector3(10, 0, 7.5),
                 new THREE.Vector3(0, 0, 10)
             ]
         }
@@ -636,9 +636,10 @@ function setupScene() {
     scene.background = new THREE.Color(0x000000); // Black background
     
     // Create camera - positioned further back to show more of the scene
+    console.log('Setting up camera...');
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 25, 35); // Original position with moderate height and distance
-    camera.lookAt(0, 0, -35); // Moderate tilt to see both board and environment
+    camera.position.set(0, 40, 15);
+    camera.lookAt(0, 0, -5); // Moderate tilt to see both board and environment
     
     // Create renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -887,26 +888,28 @@ function createBush(x, z) {
 // Generate tower slots along the path (modified for flat terrain)
 function generateTowerSlots() {
     gameState.towerSlots = [];
-    
-    // Create tower slots along all paths
+
+    // Create tower slots at exact coordinates
     const slotPositions = [
         // Left path slots
-        { x: -18.5, z: -15 },  // Moved left by 3.5 units
-        { x: -18.5, z: -5 },   // Moved left by 3.5 units
-        { x: -10, z: 0 },
-        { x: -5, z: 5 },
-        
-        // Center path slots (original positions)
-        { x: -3.5, z: -15 },
-        { x: 3.5, z: -15 },
-        { x: -3.5, z: -5 },
-        { x: 3.5, z: -5 },
-        
+        { x: -20, z: -17.5 },
+        { x: -20, z: -7.5 },
+        { x: -20, z: 0 },
+        { x: -10, z: 7.5 },
+
+        // Center path slots
+        { x: -5, z: -2.5 },
+        { x: 5, z: -2.5 },
+        { x: -5, z: -7.5 },
+        { x: 5, z: -7.5 },
+        { x: -5, z: -17.5 },
+        { x: 5, z: -17.5 },
+
         // Right path slots
-        { x: 18.5, z: -15 },   // Moved right by 3.5 units
-        { x: 18.5, z: -5 },    // Moved right by 3.5 units
-        { x: 10, z: 0 },
-        { x: 5, z: 5 }
+        { x: 7.5, z: 7.5 },
+        { x: 20, z: 0 },
+        { x: 20, z: -17.5 },
+        { x: 20, z: -7.5 }
     ];
     
     slotPositions.forEach((position, index) => {
@@ -1323,12 +1326,11 @@ function spawnCreep() {
         // Randomly select a path for this creep
         const pathIndex = Math.floor(Math.random() * gameState.paths.length);
         const path = gameState.paths[pathIndex];
-        const spawnPoint = path.spawnPoint;
+        const spawnPoint = path.waypoints[0]; // Use first waypoint as spawn point
         
         // Create 3D mesh with the appropriate type
         const creepMesh = createCreepMesh(creepType);
-        // Adjust z position to account for creep height
-        creepMesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z + 0.5);
+        creepMesh.position.set(spawnPoint.x, 0.5, spawnPoint.z); // Set initial position at first waypoint
         scene.add(creepMesh);
         
         // Set type-specific properties
@@ -1339,22 +1341,22 @@ function spawnCreep() {
             case 'fast':
                 health = 15;
                 damage = 2;
-                speed = 3.45; // Increased from 3.0
+                speed = 3.45;
                 break;
             case 'armored':
                 health = 35;
                 damage = 2;
-                speed = 1.725; // Increased from 1.5
+                speed = 1.725;
                 break;
             case 'swarm':
                 health = 10;
                 damage = 1;
-                speed = 2.53; // Increased from 2.2
+                speed = 2.53;
                 break;
             default:
                 health = 25;
                 damage = 2;
-                speed = 2.3; // Increased from 2.0
+                speed = 2.3;
                 break;
         }
         
@@ -1367,13 +1369,13 @@ function spawnCreep() {
         // Add to game state with all required properties
         const creep = {
             mesh: creepMesh,
-            position: { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z + 0.5 },
+            position: { x: spawnPoint.x, y: 0.5, z: spawnPoint.z },
             progress: 0,
             health: health,
             maxHealth: health,
             baseSpeed: speed,
             speed: speed,
-            slowEffects: [], // Initialize empty array for slow effects
+            slowEffects: [],
             effects: {
                 slow: [],
                 burn: null
@@ -1437,11 +1439,11 @@ function spawnCreepOnPath(pathIndex) {
 
         // Create creep mesh with the correct type
         const creepMesh = createCreepMesh(creepType);
-        // Adjust z position to account for creep height
+        // Set initial position at first waypoint
         creepMesh.position.set(
             path.waypoints[0].x,
-            path.waypoints[0].y,
-            path.waypoints[0].z + 0.5
+            0.5, // Keep constant height
+            path.waypoints[0].z
         );
         scene.add(creepMesh);
         
@@ -1453,22 +1455,22 @@ function spawnCreepOnPath(pathIndex) {
             case 'fast':
                 health = 15;
                 damage = 2;
-                speed = 3.45; // Increased from 3.0
+                speed = 3.45;
                 break;
             case 'armored':
                 health = 35;
                 damage = 2;
-                speed = 1.725; // Increased from 1.5
+                speed = 1.725;
                 break;
             case 'swarm':
                 health = 10;
                 damage = 1;
-                speed = 2.53; // Increased from 2.2
+                speed = 2.53;
                 break;
             default:
                 health = 25;
                 damage = 2;
-                speed = 2.3; // Increased from 2.0
+                speed = 2.3;
                 break;
         }
         
@@ -1483,15 +1485,15 @@ function spawnCreepOnPath(pathIndex) {
             mesh: creepMesh,
             position: { 
                 x: path.waypoints[0].x,
-                y: path.waypoints[0].y,
-                z: path.waypoints[0].z + 0.5
+                y: 0.5,
+                z: path.waypoints[0].z
             },
             progress: 0,
             health: health,
             maxHealth: health,
             baseSpeed: speed,
             speed: speed,
-            slowEffects: [], // Initialize empty array for slow effects
+            slowEffects: [],
             effects: {
                 slow: [],
                 burn: null
@@ -1752,45 +1754,29 @@ function updateCreepSpeed(creep) {
 // Update creeps
 function updateCreeps(delta) {
     // Skip update if no creeps
-    if (gameState.creeps.length === 0) {
-        // Check if round should end (all creeps killed and all creeps spawned)
-        if (gameState.roundActive && gameState.creepsToSpawn === 0) {
-            console.log("All creeps killed and spawned, ending round");
-            endRound();
-        }
-        return;
-    }
-        
-    // Update burn effect
-    gameState.creeps.forEach(creep => {
-        if (creep.effects && creep.effects.burn) {
-            creep.effects.burn.timeRemaining -= delta;
-            if (creep.effects.burn.timeRemaining <= 0) {
-                creep.effects.burn = null;
-            } else {
-                creep.health -= creep.effects.burn.damagePerSecond * delta;
-                if (creep.health <= 0) {
-                    // Creep died from burn
-                    gameState.gold += 5;
-                    updateGold();
-                    scene.remove(creep.mesh);
-                    const index = gameState.creeps.indexOf(creep);
-                    if (index > -1) {
-                        gameState.creeps.splice(index, 1);
-                    }
-                    console.log("Creep died from burn. Remaining creeps:", gameState.creeps.length);
-                }
+    if (gameState.creeps.length === 0) return;
+
+    // Update burn effects
+    for (let i = gameState.creeps.length - 1; i >= 0; i--) {
+        const creep = gameState.creeps[i];
+        if (creep.effects.burn) {
+            creep.health -= creep.effects.burn.damage * delta;
+            if (creep.health <= 0) {
+                // Add gold for kill
+                gameState.gold += gameState.goldPerKill;
+                updateGold();
+                
+                // Remove creep from scene and game state
+                scene.remove(creep.mesh);
+                gameState.creeps.splice(i, 1);
             }
         }
-    });
+    }
 
-    // Update slow effects and creep speed
-    gameState.creeps.forEach(creep => {
-        if (creep.slowEffects) {
-            updateCreepSlowEffects(creep, delta);
-            updateCreepSpeed(creep);
-        }
-    });
+    // Update slow effects
+    for (let i = 0; i < gameState.creeps.length; i++) {
+        updateCreepSlowEffects(gameState.creeps[i], delta);
+    }
 
     // Move creeps along their paths
     for (let i = gameState.creeps.length - 1; i >= 0; i--) {
@@ -1806,13 +1792,24 @@ function updateCreeps(delta) {
 
         if (!nextWaypoint) {
             // Creep reached the king
-            gameState.kingHealth -= creep.damageToKing;
-            updateKingHealth();
+            if (!creep.reachedKing) {
+                creep.reachedKing = true;
+                gameState.kingHealth -= creep.damageToKing;
+                updateKingHealth();
+                console.log("Creep reached king. King health:", gameState.kingHealth);
+                
+                // Check for game over
+                if (gameState.kingHealth <= 0) {
+                    showGameOverScreen(false);
+                    return;
+                }
+            }
+            
+            // Remove creep after dealing damage
             scene.remove(creep.mesh);
             gameState.creeps.splice(i, 1);
-            console.log("Creep reached king. Remaining creeps:", gameState.creeps.length);
             
-            // Check if round should end after creep reaches king
+            // Check if round should end
             if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
                 console.log("All creeps killed or reached king, ending round");
                 endRound();
@@ -1820,25 +1817,73 @@ function updateCreeps(delta) {
             continue;
         }
 
-        const direction = nextWaypoint.clone().sub(currentWaypoint);
-        const distance = direction.length();
-        direction.normalize();
-
-        const movement = direction.multiplyScalar(creep.speed * delta);
-        // Maintain the creep's height when moving
-        creep.mesh.position.x += movement.x;
+        // Calculate direct differences in coordinates
+        const dx = nextWaypoint.x - creep.mesh.position.x;
+        const dz = nextWaypoint.z - creep.mesh.position.z;
+        
+        // Calculate actual distance using Pythagorean theorem
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        
+        // Calculate how far the creep should move this frame
+        const moveDistance = creep.speed * delta;
+        
+        // Calculate the ratio of movement
+        const ratio = moveDistance / distance;
+        
+        // Apply movement using the ratio
+        creep.mesh.position.x += dx * ratio;
         creep.mesh.position.y = 0.5; // Keep constant height
-        creep.mesh.position.z += movement.z;
+        creep.mesh.position.z += dz * ratio;
 
         // Update creep's position property to match mesh
         creep.position.x = creep.mesh.position.x;
         creep.position.y = creep.mesh.position.y;
         creep.position.z = creep.mesh.position.z;
 
-        // Check if reached waypoint
-        if (getDistance3D(creep.mesh.position, nextWaypoint) < 0.1) {
+        // Calculate the angle the creep should face
+        const angle = Math.atan2(dx, dz);
+        creep.mesh.rotation.y = angle;
+
+        // Check if reached waypoint using the same distance calculation
+        if (distance < 0.1) {
+            // Snap to waypoint position to prevent drift
+            creep.mesh.position.set(nextWaypoint.x, 0.5, nextWaypoint.z);
+            creep.position.x = nextWaypoint.x;
+            creep.position.y = 0.5;
+            creep.position.z = nextWaypoint.z;
+            
+            // Move to next waypoint
             creep.currentWaypoint++;
+            
+            // Debug logging
+            console.log(`Creep ${i} reached waypoint ${creep.currentWaypoint - 1}, moving to next`);
         }
+
+        // Update creep's progress along the path
+        let totalPathLength = 0;
+        for (let j = 0; j < creep.path.waypoints.length - 1; j++) {
+            const wp1 = creep.path.waypoints[j];
+            const wp2 = creep.path.waypoints[j + 1];
+            const dx = wp2.x - wp1.x;
+            const dz = wp2.z - wp1.z;
+            totalPathLength += Math.sqrt(dx * dx + dz * dz);
+        }
+
+        let distanceTraveled = 0;
+        // Add up distances to completed waypoints
+        for (let j = 0; j < creep.currentWaypoint; j++) {
+            const wp1 = creep.path.waypoints[j];
+            const wp2 = creep.path.waypoints[j + 1];
+            const dx = wp2.x - wp1.x;
+            const dz = wp2.z - wp1.z;
+            distanceTraveled += Math.sqrt(dx * dx + dz * dz);
+        }
+        // Add distance to current waypoint
+        const currentDx = creep.mesh.position.x - currentWaypoint.x;
+        const currentDz = creep.mesh.position.z - currentWaypoint.z;
+        distanceTraveled += Math.sqrt(currentDx * currentDx + currentDz * currentDz);
+
+        creep.progress = distanceTraveled / totalPathLength;
     }
 
     // Check if round should end (all creeps killed and all creeps spawned)
@@ -2970,40 +3015,7 @@ function updateTowerOptionsAvailability() {
 window.addEventListener('load', initGame);
 
 if (!gameState.paths) {
-    gameState.paths = [
-        // Left path
-        { 
-            spawnPoint: new THREE.Vector3(-15, 0, -25),
-            waypoints: [
-                new THREE.Vector3(-15, 0, -25),
-                new THREE.Vector3(-15, 0, -10),
-                new THREE.Vector3(-15, 0, 0),
-                new THREE.Vector3(-10, 0, 5),
-                new THREE.Vector3(-5, 0, 7),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        },
-        // Center path
-        {
-            spawnPoint: new THREE.Vector3(0, 0, -25),
-            waypoints: [
-                new THREE.Vector3(0, 0, -25),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        },
-        // Right path
-        {
-            spawnPoint: new THREE.Vector3(15, 0, -25),
-            waypoints: [
-                new THREE.Vector3(15, 0, -25),
-                new THREE.Vector3(15, 0, -10),
-                new THREE.Vector3(15, 0, 0),
-                new THREE.Vector3(10, 0, 5),
-                new THREE.Vector3(5, 0, 7),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        }
-    ];
+    console.error("GameState paths not initialized!");
 }
 
 // Clear all range indicators
