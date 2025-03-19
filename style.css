@@ -42,6 +42,19 @@ body {
     user-select: none;
 }
 
+#worker-camp {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    padding: 10px;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-bottom-right-radius: 10px;
+    user-select: none;
+    width: 200px;
+}
+
 #game-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -636,4 +649,70 @@ body {
 .golden-towers-icon-small {
     background: linear-gradient(135deg, #ffd700, #daa520);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.worker-camp-header {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-align: center;
+    color: #ffd700;
+}
+
+.worker-list {
+    margin-bottom: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.worker-item {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+
+.worker-icon {
+    width: 20px;
+    height: 20px;
+    background-color: #8b4513;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.worker-info {
+    flex-grow: 1;
+}
+
+.worker-name {
+    font-size: 0.9em;
+    margin-bottom: 2px;
+}
+
+.worker-status {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.buy-worker-btn {
+    width: 100%;
+    padding: 8px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+.buy-worker-btn:hover {
+    background-color: #45a049;
+}
+
+.buy-worker-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
 }

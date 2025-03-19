@@ -275,7 +275,12 @@ let gameState = {
                 gameState.goldPerKill += 1;
             }
         }
-    ]
+    ],
+    workers: [],
+    workerCost: 3,
+    goldPerWorker: 1,
+    workerMiningInterval: 3, // seconds
+    workerMiningTimers: {}
 };
 
 // Three.js variables
@@ -370,6 +375,9 @@ function initGame() {
     
     // Show augment selection at game start
     showAugmentSelection();
+    
+    createWorkerCamp();
+    updateBuyWorkerButton();
 }
 
 // Create creep mesh without using CapsuleGeometry
@@ -1386,6 +1394,8 @@ function animate() {
                 }
             }
         }
+        
+        updateWorkers(delta);
     }
     
     // Always render the scene (even when paused)
@@ -2938,6 +2948,9 @@ function setupEventListeners() {
       observer.observe(towerSelectionMenu, { attributes: true, attributeFilter: ['class'] });
     }
   });
+
+    const buyWorkerBtn = document.getElementById('buy-worker');
+    buyWorkerBtn.addEventListener('click', buyWorker);
 }
 
 // Direct event handlers for tower options (add to HTML)
@@ -3483,4 +3496,129 @@ function updateAugmentTracker() {
             augmentList.appendChild(augmentItem);
         }
     });
+}
+
+function createWorkerMesh() {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const worker = new THREE.Mesh(geometry, material);
+    worker.scale.set(0.5, 0.5, 0.5); // Make workers smaller
+    return worker;
+}
+
+function createWorkerCamp() {
+    // Create a simple camp structure
+    const campGeometry = new THREE.BoxGeometry(5, 0.5, 5);
+    const campMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const camp = new THREE.Mesh(campGeometry, campMaterial);
+    camp.position.set(-20, 0.25, 0); // Position on the left side of the map
+    scene.add(camp);
+
+    // Add some decorative elements
+    const tentGeometry = new THREE.ConeGeometry(1, 2, 4);
+    const tentMaterial = new THREE.MeshPhongMaterial({ color: 0x8B0000 });
+    const tent = new THREE.Mesh(tentGeometry, tentMaterial);
+    tent.position.set(-20, 1, 0);
+    scene.add(tent);
+
+    // Create mining spots (rocks)
+    const rockPositions = [
+        { x: -25, z: -2 },
+        { x: -25, z: 2 },
+        { x: -15, z: -2 },
+        { x: -15, z: 2 }
+    ];
+
+    rockPositions.forEach(pos => {
+        createRock(pos.x, pos.z);
+    });
+}
+
+function buyWorker() {
+    if (gameState.gold >= gameState.workerCost) {
+        gameState.gold -= gameState.workerCost;
+        updateGold();
+
+        const worker = {
+            id: `worker-${gameState.workers.length + 1}`,
+            mesh: createWorkerMesh(),
+            position: new THREE.Vector3(-20, 0.5, 0),
+            targetRock: null,
+            miningTimer: 0
+        };
+
+        worker.mesh.position.copy(worker.position);
+        scene.add(worker.mesh);
+        gameState.workers.push(worker);
+        assignWorkerToRock(worker);
+        updateWorkerList();
+        updateBuyWorkerButton();
+    }
+}
+
+function assignWorkerToRock(worker) {
+    // Find the nearest available rock
+    const rocks = scene.children.filter(child => 
+        child.userData.type === 'rock' && 
+        !gameState.workers.some(w => w.targetRock === child)
+    );
+
+    if (rocks.length > 0) {
+        const nearestRock = rocks.reduce((nearest, rock) => {
+            const distance = getDistance3D(worker.position, rock.position);
+            return distance < getDistance3D(worker.position, nearest.position) ? rock : nearest;
+        }, rocks[0]);
+
+        worker.targetRock = nearestRock;
+        worker.mesh.position.copy(nearestRock.position);
+        worker.mesh.position.y = 0.5;
+    }
+}
+
+function updateWorkers(delta) {
+    gameState.workers.forEach(worker => {
+        if (worker.targetRock) {
+            worker.miningTimer += delta;
+            if (worker.miningTimer >= gameState.workerMiningInterval) {
+                worker.miningTimer = 0;
+                gameState.gold += gameState.goldPerWorker;
+                updateGold();
+            }
+        }
+    });
+}
+
+function updateWorkerList() {
+    const workerList = document.getElementById('worker-list');
+    workerList.innerHTML = '';
+    
+    gameState.workers.forEach(worker => {
+        const workerItem = document.createElement('div');
+        workerItem.className = 'worker-item';
+        
+        const icon = document.createElement('div');
+        icon.className = 'worker-icon';
+        
+        const info = document.createElement('div');
+        info.className = 'worker-info';
+        
+        const name = document.createElement('div');
+        name.className = 'worker-name';
+        name.textContent = worker.id;
+        
+        const status = document.createElement('div');
+        status.className = 'worker-status';
+        status.textContent = worker.targetRock ? 'Mining' : 'Idle';
+        
+        info.appendChild(name);
+        info.appendChild(status);
+        workerItem.appendChild(icon);
+        workerItem.appendChild(info);
+        workerList.appendChild(workerItem);
+    });
+}
+
+function updateBuyWorkerButton() {
+    const buyWorkerBtn = document.getElementById('buy-worker');
+    buyWorkerBtn.disabled = gameState.gold < gameState.workerCost;
 }
