@@ -544,3 +544,96 @@ body {
     color: rgba(255, 255, 255, 0.8);
     line-height: 1.4;
 }
+
+/* Augment Tracker Styles */
+#augment-tracker {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 10px;
+    padding: 12px;
+    color: white;
+    user-select: none;
+    z-index: 3;
+    width: 250px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    transition: opacity 0.3s ease;
+}
+
+.augment-tracker-header {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 5px;
+    color: #ffd700;
+}
+
+.augment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.augment-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.augment-item:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.augment-icon-small {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.augment-info-small {
+    flex: 1;
+}
+
+.augment-name-small {
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+.augment-description-small {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Small Augment Icons for Tracker */
+.rage-icon-small {
+    background: linear-gradient(135deg, #ff4500, #ff0000);
+    box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
+}
+
+.catapult-icon-small {
+    background: linear-gradient(135deg, #8b4513, #654321);
+    box-shadow: 0 0 10px rgba(139, 69, 19, 0.5);
+}
+
+.bloodbath-icon-small {
+    background: linear-gradient(135deg, #800000, #ff0000);
+    box-shadow: 0 0 10px rgba(128, 0, 0, 0.5);
+}
+
+.hellfire-icon-small {
+    background: linear-gradient(135deg, #ff8c00, #ff4500);
+    box-shadow: 0 0 10px rgba(255, 140, 0, 0.5);
+}
+
+.golden-towers-icon-small {
+    background: linear-gradient(135deg, #ffd700, #daa520);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}

@@ -358,6 +358,7 @@ function initGame() {
     // Update UI
     updateUI();
     updateRoundTracker();
+    updateAugmentTracker(); // Add this line
     
     // Setup event listeners
     setupEventListeners();
@@ -1326,7 +1327,8 @@ function spawnCreep() {
         
         // Create 3D mesh with the appropriate type
         const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+        // Adjust z position to account for creep height
+        creepMesh.position.set(spawnPoint.x, spawnPoint.y, spawnPoint.z + 0.5);
         scene.add(creepMesh);
         
         // Set type-specific properties
@@ -1337,22 +1339,22 @@ function spawnCreep() {
             case 'fast':
                 health = 15;
                 damage = 2;
-                speed = 3;
+                speed = 3.45; // Increased from 3.0
                 break;
             case 'armored':
                 health = 35;
                 damage = 2;
-                speed = 1.5;
+                speed = 1.725; // Increased from 1.5
                 break;
             case 'swarm':
                 health = 10;
                 damage = 1;
-                speed = 2.2;
+                speed = 2.53; // Increased from 2.2
                 break;
             default:
                 health = 25;
                 damage = 2;
-                speed = 2;
+                speed = 2.3; // Increased from 2.0
                 break;
         }
         
@@ -1365,7 +1367,7 @@ function spawnCreep() {
         // Add to game state with all required properties
         const creep = {
             mesh: creepMesh,
-            position: { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z },
+            position: { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z + 0.5 },
             progress: 0,
             health: health,
             maxHealth: health,
@@ -1435,7 +1437,12 @@ function spawnCreepOnPath(pathIndex) {
 
         // Create creep mesh with the correct type
         const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.copy(path.waypoints[0]);
+        // Adjust z position to account for creep height
+        creepMesh.position.set(
+            path.waypoints[0].x,
+            path.waypoints[0].y,
+            path.waypoints[0].z + 0.5
+        );
         scene.add(creepMesh);
         
         // Set type-specific properties
@@ -1446,22 +1453,22 @@ function spawnCreepOnPath(pathIndex) {
             case 'fast':
                 health = 15;
                 damage = 2;
-                speed = 3;
+                speed = 3.45; // Increased from 3.0
                 break;
             case 'armored':
                 health = 35;
                 damage = 2;
-                speed = 1.5;
+                speed = 1.725; // Increased from 1.5
                 break;
             case 'swarm':
                 health = 10;
                 damage = 1;
-                speed = 2.2;
+                speed = 2.53; // Increased from 2.2
                 break;
             default:
                 health = 25;
                 damage = 2;
-                speed = 2;
+                speed = 2.3; // Increased from 2.0
                 break;
         }
         
@@ -1474,7 +1481,11 @@ function spawnCreepOnPath(pathIndex) {
         // Create creep object with type-specific properties
         const creep = {
             mesh: creepMesh,
-            position: { x: path.waypoints[0].x, y: path.waypoints[0].y, z: path.waypoints[0].z },
+            position: { 
+                x: path.waypoints[0].x,
+                y: path.waypoints[0].y,
+                z: path.waypoints[0].z + 0.5
+            },
             progress: 0,
             health: health,
             maxHealth: health,
@@ -1741,9 +1752,14 @@ function updateCreepSpeed(creep) {
 // Update creeps
 function updateCreeps(delta) {
     // Skip update if no creeps
-    if (!gameState.creeps || gameState.creeps.length === 0) {
-            return;
+    if (gameState.creeps.length === 0) {
+        // Check if round should end (all creeps killed and all creeps spawned)
+        if (gameState.roundActive && gameState.creepsToSpawn === 0) {
+            console.log("All creeps killed and spawned, ending round");
+            endRound();
         }
+        return;
+    }
         
     // Update burn effect
     gameState.creeps.forEach(creep => {
@@ -1795,6 +1811,12 @@ function updateCreeps(delta) {
             scene.remove(creep.mesh);
             gameState.creeps.splice(i, 1);
             console.log("Creep reached king. Remaining creeps:", gameState.creeps.length);
+            
+            // Check if round should end after creep reaches king
+            if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
+                console.log("All creeps killed or reached king, ending round");
+                endRound();
+            }
             continue;
         }
 
@@ -1803,17 +1825,25 @@ function updateCreeps(delta) {
         direction.normalize();
 
         const movement = direction.multiplyScalar(creep.speed * delta);
-        creep.mesh.position.add(movement);
+        // Maintain the creep's height when moving
+        creep.mesh.position.x += movement.x;
+        creep.mesh.position.y = 0.5; // Keep constant height
+        creep.mesh.position.z += movement.z;
+
+        // Update creep's position property to match mesh
+        creep.position.x = creep.mesh.position.x;
+        creep.position.y = creep.mesh.position.y;
+        creep.position.z = creep.mesh.position.z;
 
         // Check if reached waypoint
-        if (creep.mesh.position.distanceTo(nextWaypoint) < 0.1) {
+        if (getDistance3D(creep.mesh.position, nextWaypoint) < 0.1) {
             creep.currentWaypoint++;
         }
     }
 
-    // Check if round should end (all creeps killed)
-    if (gameState.roundActive && gameState.creeps.length === 0) {
-        console.log("All creeps killed, ending round");
+    // Check if round should end (all creeps killed and all creeps spawned)
+    if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
+        console.log("All creeps killed and spawned, ending round");
         endRound();
     }
 }
@@ -2323,6 +2353,10 @@ function startRound() {
     
     // Get current round definition before incrementing
     const currentRoundDef = gameState.roundDefinitions[gameState.currentRound];
+    if (!currentRoundDef) {
+        console.error("Invalid round definition for round:", gameState.currentRound);
+        return;
+    }
     
     // Increment round counter
     gameState.currentRound++;
@@ -2363,16 +2397,16 @@ function startRound() {
             console.log("Spawned creep", spawnCount, "of", gameState.creepsToSpawn);
         } else {
             clearInterval(spawnInterval);
+            gameState.creepsToSpawn = 0; // Only set to 0 when all creeps are spawned
             console.log("Finished spawning all creeps");
         }
-    }, 1000); // 1 second delay between spawns
+    }, 500); // Reduced from 1000ms to 500ms for faster spawning
     
     // Start round timer
     gameState.roundTimer = 0;
     updateRoundTimer();
 }
 
-// End round function
 function endRound() {
     console.log("Ending round", gameState.currentRound);
     
@@ -2392,7 +2426,6 @@ function endRound() {
     startInterRoundTimer();
 }
 
-// Start timer between rounds
 function startInterRoundTimer() {
     console.log("Starting inter-round timer");
     
@@ -2402,24 +2435,24 @@ function startInterRoundTimer() {
         gameState.timerInterval = null;
     }
     
-    // Set initial timer value
+    // Reset timer to 10 seconds
     gameState.interRoundTimer = 10;
     updateRoundTimer();
     
-    // Start the countdown
+    // Start countdown timer
     gameState.timerInterval = setInterval(() => {
         if (!gameState.isPaused) {
-        gameState.interRoundTimer--;
-        updateRoundTimer();
-        
-        if (gameState.interRoundTimer <= 0) {
-            clearInterval(gameState.timerInterval);
+            gameState.interRoundTimer--;
+            updateRoundTimer();
+            
+            // When timer reaches 0, start next round
+            if (gameState.interRoundTimer <= 0) {
+                clearInterval(gameState.timerInterval);
                 gameState.timerInterval = null;
-                console.log("Inter-round timer finished, starting next round");
-            startRound();
+                startRound();
             }
         }
-    }, 1000);
+    }, 1000); // Update every second
 }
 
 
@@ -3293,4 +3326,82 @@ function resetRoundAugments() {
             augment.reset(tower);
         }
     });
+}
+
+// Function to update the augment tracker UI
+function updateAugmentTracker() {
+    const augmentList = document.getElementById('augment-list');
+    augmentList.innerHTML = ''; // Clear existing augments
+    
+    // Get all active augments
+    gameState.activeAugments.forEach(augmentId => {
+        const augment = gameState.availableAugments.find(a => a.id === augmentId);
+        if (augment) {
+            // Create augment item element
+            const augmentItem = document.createElement('div');
+            augmentItem.className = 'augment-item';
+            
+            // Create icon element
+            const icon = document.createElement('div');
+            icon.className = `augment-icon-small ${augmentId}-icon`;
+            
+            // Create info container
+            const info = document.createElement('div');
+            info.className = 'augment-info-small';
+            
+            // Create name element
+            const name = document.createElement('div');
+            name.className = 'augment-name-small';
+            name.textContent = augment.name;
+            
+            // Create description element
+            const description = document.createElement('div');
+            description.className = 'augment-description-small';
+            description.textContent = augment.description;
+            
+            // Assemble the elements
+            info.appendChild(name);
+            info.appendChild(description);
+            augmentItem.appendChild(icon);
+            augmentItem.appendChild(info);
+            
+            // Add to the list
+            augmentList.appendChild(augmentItem);
+        }
+    });
+}
+
+// Function to handle augment selection
+function selectAugment(augment) {
+    // Add augment to active augments
+    gameState.activeAugments.push(augment.id);
+    
+    // Apply the augment effect
+    if (augment.id === 'golden-towers') {
+        augment.effect();
+    } else {
+        gameState.towers.forEach(tower => augment.effect(tower));
+    }
+    
+    // Update the augment tracker
+    updateAugmentTracker();
+    
+    // Hide the modal
+    document.getElementById('augment-modal').classList.add('hidden');
+    
+    // Start the round
+    startRound();
+}
+
+// Function to reset round-specific augments
+function resetRoundAugments() {
+    gameState.towers.forEach(tower => {
+        if (gameState.activeAugments.includes('towers-of-rage')) {
+            const augment = gameState.availableAugments.find(a => a.id === 'towers-of-rage');
+            augment.reset(tower);
+        }
+    });
+    
+    // Update the augment tracker after resetting
+    updateAugmentTracker();
 }
