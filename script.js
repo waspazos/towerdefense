@@ -583,7 +583,7 @@ function updateRoundTracker() {
     const futureRound = currentRound + 2;
     
     // Update previous round
-    if (previousRound >= 0) {
+    if (previousRound >= 0 && gameState.roundDefinitions && gameState.roundDefinitions[previousRound - 1]) {
         document.getElementById('previous-round').textContent = previousRound;
         const prevRoundDef = gameState.roundDefinitions[previousRound - 1];
         document.getElementById('previous-round-details').textContent = prevRoundDef.type.charAt(0).toUpperCase() + prevRoundDef.type.slice(1);
@@ -594,7 +594,7 @@ function updateRoundTracker() {
     
     // Update current round
     document.getElementById('current-round').textContent = currentRound;
-    if (currentRound >= 1 && currentRound <= gameState.maxRounds) {
+    if (currentRound >= 1 && currentRound <= gameState.maxRounds && gameState.roundDefinitions && gameState.roundDefinitions[currentRound - 1]) {
         const currRoundDef = gameState.roundDefinitions[currentRound - 1];
         document.getElementById('current-round-details').textContent = currRoundDef.type.charAt(0).toUpperCase() + currRoundDef.type.slice(1);
     } else {
@@ -602,7 +602,7 @@ function updateRoundTracker() {
     }
     
     // Update next round
-    if (nextRound <= gameState.maxRounds) {
+    if (nextRound <= gameState.maxRounds && gameState.roundDefinitions && gameState.roundDefinitions[nextRound - 1]) {
         document.getElementById('next-round').textContent = nextRound;
         const nextRoundDef = gameState.roundDefinitions[nextRound - 1];
         document.getElementById('next-round-details').textContent = nextRoundDef.type.charAt(0).toUpperCase() + nextRoundDef.type.slice(1);
@@ -612,7 +612,7 @@ function updateRoundTracker() {
     }
     
     // Update future round
-    if (futureRound <= gameState.maxRounds) {
+    if (futureRound <= gameState.maxRounds && gameState.roundDefinitions && gameState.roundDefinitions[futureRound - 1]) {
         document.getElementById('future-round').textContent = futureRound;
         const futureRoundDef = gameState.roundDefinitions[futureRound - 1];
         document.getElementById('future-round-details').textContent = futureRoundDef.type.charAt(0).toUpperCase() + futureRoundDef.type.slice(1);
@@ -2254,11 +2254,20 @@ function fireProjectile(tower, target, damageMultiplier = 1) {
     let damage = gameState.towerTypes[tower.type].ranks[tower.rank - 1].damage * damageMultiplier;
     let isCritical = false;
     
-    // Apply Bloodbath augment if active
-    if (gameState.activeAugments.includes('bloodbath')) {
-        const critChance = tower.type === 'fire' ? 0.3 : 0.15;
+    // Check for critical hit (base tower crit or Bloodbath augment)
+    if (tower.type === 'fire' || gameState.activeAugments.includes('bloodbath')) {
+        let critChance = tower.type === 'fire' ? 
+            gameState.towerTypes[tower.type].ranks[tower.rank - 1].critChance : 0.15;
+        let critMultiplier = tower.type === 'fire' ? 
+            gameState.towerTypes[tower.type].ranks[tower.rank - 1].critMultiplier : 1.5;
+            
+        // Apply Bloodbath augment if active
+        if (gameState.activeAugments.includes('bloodbath')) {
+            critChance = tower.type === 'fire' ? 0.9 : 0.3;
+            critMultiplier = tower.type === 'fire' ? 1.65 : 1.5;
+        }
+        
         if (Math.random() < critChance) {
-            const critMultiplier = tower.type === 'fire' ? 1.65 : 1.5;
             damage *= critMultiplier;
             isCritical = true;
         }
