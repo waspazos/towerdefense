@@ -584,8 +584,8 @@ function setupScene() {
     
     // Create camera - positioned further back to show more of the scene
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 25, 35); // Increased Y and Z values for a higher, more distant viewpoint
-    camera.lookAt(0, 0, -15);
+    camera.position.set(0, 25, 35); // Original position with moderate height and distance
+    camera.lookAt(0, 0, -35); // Moderate tilt to see both board and environment
     
     // Create renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -647,7 +647,56 @@ function createTerrainGround() {
 
 // Create path (simplified - no visual elements)
 function createPath() {
-    // No visual elements needed, paths are just defined in gameState.paths
+    // Remove any existing path group
+    if (gameState.pathGroup) {
+        scene.remove(gameState.pathGroup);
+        gameState.pathGroup = null;
+    }
+}
+
+// Create visual markers for waypoints
+function createWaypointMarkers(waypoints, pathGroup) {
+    // Create marker material
+    const markerMaterial = new THREE.MeshStandardMaterial({
+        color: 0xff0000,  // Red color for visibility
+        emissive: 0xff0000,
+        emissiveIntensity: 0.5,
+        side: THREE.DoubleSide
+    });
+
+    // Create marker geometry
+    const markerGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+
+    // Create markers for each waypoint
+    waypoints.forEach((waypoint, index) => {
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.set(waypoint.x, 0.3, waypoint.z); // Slightly above the path
+        pathGroup.add(marker);
+
+        // Add a small number label
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 64;
+        canvas.height = 64;
+        
+        // Draw number
+        context.fillStyle = 'white';
+        context.fillRect(0, 0, 64, 64);
+        context.fillStyle = 'black';
+        context.font = 'bold 48px Arial';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText((index + 1).toString(), 32, 32);
+        
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMaterial);
+        sprite.scale.set(1, 1, 1);
+        sprite.position.set(waypoint.x, 0.8, waypoint.z);
+        
+        pathGroup.add(sprite);
+    });
 }
 
 // Create forest environment (simplified - only mountains)
@@ -1270,7 +1319,28 @@ function spawnCreep() {
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
         creep.healthBar.position.set(0, 1.2, 0);
+        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
         creepMesh.add(creep.healthBar);
+        
+        // Add billboard behavior to make health bar always face camera
+        creep.healthBar.update = function() {
+            // Get the creep's position
+            const creepPosition = creep.mesh.position;
+            
+            // Get the camera's position
+            const cameraPosition = camera.position;
+            
+            // Calculate direction from creep to camera
+            const direction = new THREE.Vector3();
+            direction.subVectors(cameraPosition, creepPosition).normalize();
+            
+            // Make the health bar face the camera
+            this.lookAt(cameraPosition);
+            
+            // Keep the health bar horizontal by resetting X and Z rotation
+            this.rotation.x = 0;
+            this.rotation.z = 0;
+        };
         
         gameState.creeps.push(creep);
     } catch (error) {
@@ -1349,7 +1419,28 @@ function spawnCreepOnPath(pathIndex) {
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
         creep.healthBar.position.set(0, 1.2, 0);
+        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
         creepMesh.add(creep.healthBar);
+        
+        // Add billboard behavior to make health bar always face camera
+        creep.healthBar.update = function() {
+            // Get the creep's position
+            const creepPosition = creep.mesh.position;
+            
+            // Get the camera's position
+            const cameraPosition = camera.position;
+            
+            // Calculate direction from creep to camera
+            const direction = new THREE.Vector3();
+            direction.subVectors(cameraPosition, creepPosition).normalize();
+            
+            // Make the health bar face the camera
+            this.lookAt(cameraPosition);
+            
+            // Keep the health bar horizontal by resetting X and Z rotation
+            this.rotation.x = 0;
+            this.rotation.z = 0;
+        };
         
         gameState.creeps.push(creep);
     } catch (error) {
@@ -1711,6 +1802,11 @@ function updateCreeps(delta) {
                 creep.healthBar.material.color.setHex(0xffff00);
             } else {
                 creep.healthBar.material.color.setHex(0xff0000);
+            }
+
+            // Update health bar orientation to face camera
+            if (typeof creep.healthBar.update === 'function') {
+                creep.healthBar.update();
             }
         }
         
