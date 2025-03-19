@@ -931,23 +931,11 @@ function createForestDetails() {
 
 // Create a rock
 function createRock(x, z) {
-    const scale = Math.random() * 0.5 + 0.3;
-    const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
-    const rockMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x888888, 
-        flatShading: true,
-        roughness: 0.8
-    });
+    const rockGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const rockMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
     const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    
-    // Position
-    rock.position.set(x, scale * 0.5, z);
-    rock.scale.set(scale, scale * 0.7, scale);
-    rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    
+    rock.position.set(x, 0.5, z);
+    rock.userData.type = 'mining-rock'; // Add this line to identify mining rocks
     scene.add(rock);
 }
 
@@ -3507,26 +3495,19 @@ function createWorkerMesh() {
 }
 
 function createWorkerCamp() {
-    // Create a simple camp structure
-    const campGeometry = new THREE.BoxGeometry(5, 0.5, 5);
-    const campMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
-    const camp = new THREE.Mesh(campGeometry, campMaterial);
-    camp.position.set(-20, 0.25, 0); // Position on the left side of the map
-    scene.add(camp);
-
     // Add some decorative elements
     const tentGeometry = new THREE.ConeGeometry(1, 2, 4);
     const tentMaterial = new THREE.MeshPhongMaterial({ color: 0x8B0000 });
     const tent = new THREE.Mesh(tentGeometry, tentMaterial);
-    tent.position.set(-20, 1, 0);
+    tent.position.set(-35, 1, 0);
     scene.add(tent);
 
     // Create mining spots (rocks)
     const rockPositions = [
-        { x: -25, z: -2 },
-        { x: -25, z: 2 },
-        { x: -15, z: -2 },
-        { x: -15, z: 2 }
+        { x: -40, z: -2 },
+        { x: -40, z: 2 },
+        { x: -30, z: -2 },
+        { x: -30, z: 2 }
     ];
 
     rockPositions.forEach(pos => {
@@ -3536,42 +3517,48 @@ function createWorkerCamp() {
 
 function buyWorker() {
     if (gameState.gold >= gameState.workerCost) {
-        gameState.gold -= gameState.workerCost;
-        updateGold();
+        // Find an available rock first
+        const availableRocks = scene.children.filter(child => 
+            child.userData.type === 'mining-rock' && // Update this line to match the new type
+            !gameState.workers.some(w => w.targetRock === child)
+        );
 
-        const worker = {
-            id: `worker-${gameState.workers.length + 1}`,
-            mesh: createWorkerMesh(),
-            position: new THREE.Vector3(-20, 0.5, 0),
-            targetRock: null,
-            miningTimer: 0
-        };
+        if (availableRocks.length > 0) {
+            gameState.gold -= gameState.workerCost;
+            updateGold();
 
-        worker.mesh.position.copy(worker.position);
-        scene.add(worker.mesh);
-        gameState.workers.push(worker);
-        assignWorkerToRock(worker);
-        updateWorkerList();
-        updateBuyWorkerButton();
-    }
-}
+            const nearestRock = availableRocks.reduce((nearest, rock) => {
+                const distance = getDistance3D(new THREE.Vector3(-35, 0.5, 0), rock.position);
+                return distance < getDistance3D(new THREE.Vector3(-35, 0.5, 0), nearest.position) ? rock : nearest;
+            }, availableRocks[0]);
 
-function assignWorkerToRock(worker) {
-    // Find the nearest available rock
-    const rocks = scene.children.filter(child => 
-        child.userData.type === 'rock' && 
-        !gameState.workers.some(w => w.targetRock === child)
-    );
+            const worker = {
+                id: `worker-${gameState.workers.length + 1}`,
+                mesh: createWorkerMesh(),
+                position: new THREE.Vector3(-35, 0.5, 0),
+                targetRock: nearestRock,
+                miningTimer: 0
+            };
 
-    if (rocks.length > 0) {
-        const nearestRock = rocks.reduce((nearest, rock) => {
-            const distance = getDistance3D(worker.position, rock.position);
-            return distance < getDistance3D(worker.position, nearest.position) ? rock : nearest;
-        }, rocks[0]);
-
-        worker.targetRock = nearestRock;
-        worker.mesh.position.copy(nearestRock.position);
-        worker.mesh.position.y = 0.5;
+            worker.mesh.position.copy(nearestRock.position);
+            worker.mesh.position.y = 0.5;
+            scene.add(worker.mesh);
+            gameState.workers.push(worker);
+            updateWorkerList();
+            updateBuyWorkerButton();
+        } else {
+            // Show a message that all mining spots are occupied
+            const workerList = document.getElementById('worker-list');
+            const message = document.createElement('div');
+            message.className = 'worker-message';
+            message.textContent = 'All mining spots are occupied!';
+            workerList.appendChild(message);
+            
+            // Remove the message after 3 seconds
+            setTimeout(() => {
+                message.remove();
+            }, 3000);
+        }
     }
 }
 
@@ -3591,6 +3578,14 @@ function updateWorkers(delta) {
 function updateWorkerList() {
     const workerList = document.getElementById('worker-list');
     workerList.innerHTML = '';
+    
+    if (gameState.workers.length === 0) {
+        const message = document.createElement('div');
+        message.className = 'worker-message';
+        message.textContent = 'No workers yet';
+        workerList.appendChild(message);
+        return;
+    }
     
     gameState.workers.forEach(worker => {
         const workerItem = document.createElement('div');

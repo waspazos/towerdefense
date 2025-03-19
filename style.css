@@ -716,3 +716,13 @@ body {
     background-color: #cccccc;
     cursor: not-allowed;
 }
+
+.worker-message {
+    text-align: center;
+    padding: 10px;
+    color: #ffd700;
+    font-style: italic;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    margin: 5px 0;
+}
