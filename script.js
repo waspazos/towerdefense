@@ -115,6 +115,12 @@ window.buildTower = function(towerType) {
             tower.critMultiplier = towerRank.critMultiplier;
         }
         
+        // Apply catapult augment if active
+        if (gameState.activeAugments.includes('catapult')) {
+            const catapultAugment = gameState.availableAugments.find(a => a.id === 'catapult');
+            catapultAugment.effect(tower);
+        }
+        
         // Add tower to game
         gameState.towers.push(tower);
         
@@ -281,9 +287,9 @@ let gameState = {
         }
     ],
     workers: [],
-    workerCost: 3,
+    workerCost: 4,
     goldPerWorker: 1,
-    workerMiningInterval: 5, // seconds
+    workerMiningInterval: 7, // seconds
     workerMiningTimers: {}
 };
 
@@ -2072,16 +2078,29 @@ function cleanupAndRestartGame() {
             scene.remove(slot.mesh);
         }
     });
+
+    // Remove all workers
+    gameState.workers.forEach(worker => {
+        if (worker.mesh && scene.children.includes(worker.mesh)) {
+            scene.remove(worker.mesh);
+        }
+    });
     
     // Clear all arrays
     gameState.creeps = [];
     gameState.towers = [];
     gameState.projectiles = [];
     gameState.towerSlots = [];
+    gameState.workers = [];
+    gameState.workerCount = 0;
     
     // Reset range indicator references
     gameState.selectedTower = null;
     gameState.towerSlotRangeIndicator = null;
+    
+    // Update worker UI
+    updateWorkerList();
+    updateBuyWorkerButton();
     
     // Remove all other scene objects
     while (scene.children.length > 0) {
