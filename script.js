@@ -314,18 +314,19 @@ function initGame() {
     gameState.paths = [
         // Left path
         { 
-            spawnPoint: new THREE.Vector3(-15, 0, -20),
+            spawnPoint: new THREE.Vector3(-15, 0, -24),
             waypoints: [
                 new THREE.Vector3(-15, 0, -17.5),
                 new THREE.Vector3(-15, 0, -7.5),
                 new THREE.Vector3(-15, 0, 0),
-                new THREE.Vector3(-10, 0, 7.5),
+                new THREE.Vector3(-10, 0, 2.5),
+                new THREE.Vector3(0, 0, 5),
                 new THREE.Vector3(0, 0, 10)
             ]
         },
         // Center path
         {
-            spawnPoint: new THREE.Vector3(0, 0, -20),
+            spawnPoint: new THREE.Vector3(0, 0, -24),
             waypoints: [
                 new THREE.Vector3(0, 0, -17.5),
                 new THREE.Vector3(0, 0, -7.5),
@@ -335,12 +336,13 @@ function initGame() {
         },
         // Right path
         {
-            spawnPoint: new THREE.Vector3(15, 0, -20),
+            spawnPoint: new THREE.Vector3(15, 0, -24),
             waypoints: [
                 new THREE.Vector3(15, 0, -17.5),
                 new THREE.Vector3(15, 0, -7.5),
                 new THREE.Vector3(15, 0, 0),
-                new THREE.Vector3(10, 0, 7.5),
+                new THREE.Vector3(10, 0, 2.5),
+                new THREE.Vector3(0, 0, 5),
                 new THREE.Vector3(0, 0, 10)
             ]
         }
@@ -706,51 +708,148 @@ function createPath() {
         scene.remove(gameState.pathGroup);
         gameState.pathGroup = null;
     }
+
+    // Create a new path group
+    gameState.pathGroup = new THREE.Group();
+    scene.add(gameState.pathGroup);
+
+    // Create visual markers for each path
+    if (gameState.paths && gameState.paths.length > 0) {
+        gameState.paths.forEach((path, pathIndex) => {
+            // Create markers for spawn point
+            const spawnMarker = new THREE.Mesh(
+                new THREE.SphereGeometry(0.3, 16, 16),
+                new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+            );
+            spawnMarker.position.copy(path.spawnPoint);
+            gameState.pathGroup.add(spawnMarker);
+
+            // Create markers for waypoints
+            path.waypoints.forEach((waypoint, index) => {
+                const markerGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+                const markerMaterial = new THREE.MeshBasicMaterial({ 
+                    color: index === path.waypoints.length - 1 ? 0xff0000 : // Last waypoint (end) is red
+                           0xffff00 // Other waypoints are yellow
+                });
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.copy(waypoint);
+                gameState.pathGroup.add(marker);
+
+                // Create connecting lines
+                if (index > 0) {
+                    const start = path.waypoints[index - 1];
+                    const end = waypoint;
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+                    const lineMaterial = new THREE.LineBasicMaterial({ 
+                        color: 0xffffff, 
+                        opacity: 0.5, 
+                        transparent: true 
+                    });
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    gameState.pathGroup.add(line);
+                }
+            });
+
+            // Create label for spawn point
+            const loader = new THREE.FontLoader();
+            loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font) {
+                const textGeometry = new THREE.TextGeometry(
+                    `Spawn ${pathIndex + 1}: (${path.spawnPoint.x.toFixed(1)}, ${path.spawnPoint.y.toFixed(1)}, ${path.spawnPoint.z.toFixed(1)})`,
+                    {
+                        font: font,
+                        size: 0.5,
+                        height: 0.1,
+                        curveSegments: 12,
+                        bevelEnabled: false
+                    }
+                );
+                const textMesh = new THREE.Mesh(textGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                textMesh.position.copy(path.spawnPoint);
+                textMesh.position.y += 1;
+                textMesh.rotation.x = -Math.PI / 2;
+                gameState.pathGroup.add(textMesh);
+
+                // Create labels for waypoints
+                path.waypoints.forEach((waypoint, index) => {
+                    const textGeometry = new THREE.TextGeometry(
+                        `WP${index + 1}: (${waypoint.x.toFixed(1)}, ${waypoint.y.toFixed(1)}, ${waypoint.z.toFixed(1)})`,
+                        {
+                            font: font,
+                            size: 0.5,
+                            height: 0.1,
+                            curveSegments: 12,
+                            bevelEnabled: false
+                        }
+                    );
+                    const textMesh = new THREE.Mesh(textGeometry, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                    textMesh.position.copy(waypoint);
+                    textMesh.position.y += 1;
+                    textMesh.rotation.x = -Math.PI / 2;
+                    gameState.pathGroup.add(textMesh);
+                });
+            });
+        });
+    } else {
+        console.error('GameState paths not initialized!');
+    }
 }
 
 // Create visual markers for waypoints
+function createWaypointLabels(waypoints) {
+    const loader = new THREE.FontLoader();
+    const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const labels = [];
+
+    loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font) {
+        waypoints.forEach((waypoint, index) => {
+            const textGeometry = new THREE.TextGeometry(
+                `WP${index + 1}: (${waypoint.x.toFixed(1)}, ${waypoint.y.toFixed(1)}, ${waypoint.z.toFixed(1)})`,
+                {
+                    font: font,
+                    size: 0.5,
+                    height: 0.1,
+                    curveSegments: 12,
+                    bevelEnabled: false
+                }
+            );
+            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+            textMesh.position.copy(waypoint);
+            textMesh.position.y += 1; // Float above the waypoint
+            textMesh.rotation.x = -Math.PI / 2; // Make text face up
+            scene.add(textMesh);
+            labels.push(textMesh);
+        });
+    });
+
+    return labels;
+}
+
 function createWaypointMarkers(waypoints, pathGroup) {
-    // Create marker material
-    const markerMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff0000,  // Red color for visibility
-        emissive: 0xff0000,
-        emissiveIntensity: 0.5,
-        side: THREE.DoubleSide
-    });
-
-    // Create marker geometry
-    const markerGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-
-    // Create markers for each waypoint
+    // Create visual markers for each waypoint
     waypoints.forEach((waypoint, index) => {
+        const markerGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+        const markerMaterial = new THREE.MeshBasicMaterial({ 
+            color: index === 0 ? 0x00ff00 : // First waypoint (spawn) is green
+                   index === waypoints.length - 1 ? 0xff0000 : // Last waypoint (end) is red
+                   0xffff00 // Other waypoints are yellow
+        });
         const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        marker.position.set(waypoint.x, 0.3, waypoint.z); // Slightly above the path
+        marker.position.copy(waypoint);
         pathGroup.add(marker);
-
-        // Add a small number label
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = 64;
-        canvas.height = 64;
-        
-        // Draw number
-        context.fillStyle = 'white';
-        context.fillRect(0, 0, 64, 64);
-        context.fillStyle = 'black';
-        context.font = 'bold 48px Arial';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText((index + 1).toString(), 32, 32);
-        
-        // Create texture from canvas
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(1, 1, 1);
-        sprite.position.set(waypoint.x, 0.8, waypoint.z);
-        
-        pathGroup.add(sprite);
     });
+
+    // Create the path lines
+    for (let i = 0; i < waypoints.length - 1; i++) {
+        const start = waypoints[i];
+        const end = waypoints[i + 1];
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.5, transparent: true });
+        const line = new THREE.Line(lineGeometry, lineMaterial);
+        pathGroup.add(line);
+    }
+
+    // Create labels for the waypoints
+    createWaypointLabels(waypoints);
 }
 
 // Create forest environment (simplified - only mountains)
@@ -895,18 +994,18 @@ function generateTowerSlots() {
         { x: -20, z: -17.5 },
         { x: -20, z: -7.5 },
         { x: -20, z: 0 },
-        { x: -10, z: 7.5 },
+        { x: -10, z: 7 },
 
         // Center path slots
-        { x: -5, z: -2.5 },
-        { x: 5, z: -2.5 },
+        { x: -5, z: 0 },
+        { x: 5, z: 0 },
         { x: -5, z: -7.5 },
         { x: 5, z: -7.5 },
         { x: -5, z: -17.5 },
         { x: 5, z: -17.5 },
 
         // Right path slots
-        { x: 7.5, z: 7.5 },
+        { x: 10, z: 7 },
         { x: 20, z: 0 },
         { x: 20, z: -17.5 },
         { x: 20, z: -7.5 }
