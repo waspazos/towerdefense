@@ -3487,11 +3487,113 @@ function updateAugmentTracker() {
 }
 
 function createWorkerMesh() {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
-    const worker = new THREE.Mesh(geometry, material);
-    worker.scale.set(0.5, 0.5, 0.5); // Make workers smaller
-    return worker;
+    try {
+        // Create group to hold all worker parts
+        const workerGroup = new THREE.Group();
+        
+        // Worker-specific colors
+        const bodyColor = 0x4169E1; // Royal blue for workers
+        const eyeColor = 0xFFFFFF;
+        const toolColor = 0x8B4513; // Brown for tools
+        
+        // Body - using combination of sphere and cylinder instead of capsule
+        const bodyGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+        const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.scale.y = 1.5; // Stretch the sphere to make it oval-shaped
+        body.castShadow = true;
+        workerGroup.add(body);
+        
+        // Head
+        const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
+        const headMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+        const head = new THREE.Mesh(headGeometry, headMaterial);
+        head.position.y = 0.4;
+        head.castShadow = true;
+        workerGroup.add(head);
+        
+        // Eyes - white and friendly
+        const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
+        const eyeMaterial = new THREE.MeshStandardMaterial({ 
+            color: eyeColor,
+            emissive: eyeColor,
+            emissiveIntensity: 0.3
+        });
+        
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.position.set(-0.1, 0.45, 0.2);
+        workerGroup.add(leftEye);
+        
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        rightEye.position.set(0.1, 0.45, 0.2);
+        workerGroup.add(rightEye);
+        
+        // Add a mining pickaxe
+        const pickaxeGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+        const pickaxeMaterial = new THREE.MeshStandardMaterial({ color: toolColor });
+        const pickaxe = new THREE.Mesh(pickaxeGeometry, pickaxeMaterial);
+        pickaxe.position.set(0.4, 0, 0);
+        pickaxe.rotation.z = -0.3;
+        workerGroup.add(pickaxe);
+        
+        // Add pickaxe head
+        const pickaxeHeadGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.1);
+        const pickaxeHead = new THREE.Mesh(pickaxeHeadGeometry, pickaxeMaterial);
+        pickaxeHead.position.set(0.5, 0.2, 0);
+        pickaxeHead.rotation.z = -0.3;
+        workerGroup.add(pickaxeHead);
+        
+        // Arms - using cylinders
+        const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
+        const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+        
+        const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+        leftArm.position.set(-0.35, 0, 0);
+        leftArm.rotation.z = 0.3;
+        workerGroup.add(leftArm);
+        
+        const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+        rightArm.position.set(0.35, 0, 0);
+        rightArm.rotation.z = -0.3;
+        workerGroup.add(rightArm);
+        
+        // Legs - using cylinders
+        const legGeometry = new THREE.CylinderGeometry(0.07, 0.07, 0.4, 8);
+        const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+        
+        const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+        leftLeg.position.set(-0.15, -0.4, 0);
+        workerGroup.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+        rightLeg.position.set(0.15, -0.4, 0);
+        workerGroup.add(rightLeg);
+        
+        // Set the entire group to cast shadows
+        workerGroup.traverse((object) => {
+            if (object.isMesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+            }
+        });
+        
+        // Add animation data
+        workerGroup.userData = {
+            walkTime: 0,
+            walkSpeed: Math.random() * 0.5 + 0.5,
+            armSwing: { left: leftArm, right: rightArm },
+            legSwing: { left: leftLeg, right: rightLeg }
+        };
+        
+        return workerGroup;
+    } catch (error) {
+        console.log("Error creating worker mesh:", error);
+        
+        // Fall back to a simple worker mesh if there's an error
+        const workerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        const workerMaterial = new THREE.MeshStandardMaterial({ color: 0x4169E1 });
+        return new THREE.Mesh(workerGeometry, workerMaterial);
+    }
 }
 
 function createWorkerCamp() {
@@ -3502,12 +3604,20 @@ function createWorkerCamp() {
     tent.position.set(-35, 1, 0);
     scene.add(tent);
 
-    // Create mining spots (rocks)
+    // Create exactly 10 mining spots (rocks) in a grid pattern
     const rockPositions = [
+        // Row 1 (back)
+        { x: -40, z: -4 },
         { x: -40, z: -2 },
+        { x: -40, z: 0 },
         { x: -40, z: 2 },
+        { x: -40, z: 4 },
+        // Row 2 (front)
+        { x: -30, z: -4 },
         { x: -30, z: -2 },
-        { x: -30, z: 2 }
+        { x: -30, z: 0 },
+        { x: -30, z: 2 },
+        { x: -30, z: 4 }
     ];
 
     rockPositions.forEach(pos => {
@@ -3519,7 +3629,7 @@ function buyWorker() {
     if (gameState.gold >= gameState.workerCost) {
         // Find an available rock first
         const availableRocks = scene.children.filter(child => 
-            child.userData.type === 'mining-rock' && // Update this line to match the new type
+            child.userData.type === 'mining-rock' &&
             !gameState.workers.some(w => w.targetRock === child)
         );
 
@@ -3527,11 +3637,14 @@ function buyWorker() {
             gameState.gold -= gameState.workerCost;
             updateGold();
 
+            // Find the nearest available rock to the worker camp
+            const workerCampPosition = new THREE.Vector3(-35, 0.5, 0);
             const nearestRock = availableRocks.reduce((nearest, rock) => {
-                const distance = getDistance3D(new THREE.Vector3(-35, 0.5, 0), rock.position);
-                return distance < getDistance3D(new THREE.Vector3(-35, 0.5, 0), nearest.position) ? rock : nearest;
+                const distance = getDistance3D(workerCampPosition, rock.position);
+                return distance < getDistance3D(workerCampPosition, nearest.position) ? rock : nearest;
             }, availableRocks[0]);
 
+            // Create and position the worker
             const worker = {
                 id: `worker-${gameState.workers.length + 1}`,
                 mesh: createWorkerMesh(),
@@ -3540,9 +3653,23 @@ function buyWorker() {
                 miningTimer: 0
             };
 
-            worker.mesh.position.copy(nearestRock.position);
-            worker.mesh.position.y = 0.5;
+            // Position the worker next to their assigned rock
+            const rockPosition = nearestRock.position;
+            const workerPosition = new THREE.Vector3(
+                rockPosition.x + 1, // Offset 1 unit to the right of the rock
+                rockPosition.y + 0.5, // Keep worker at ground level
+                rockPosition.z
+            );
+            
+            worker.mesh.position.copy(workerPosition);
+            worker.position.copy(workerPosition);
+            
+            // Make the worker face the rock
+            worker.mesh.lookAt(rockPosition);
+            
             scene.add(worker.mesh);
+            
+            // Add worker to game state
             gameState.workers.push(worker);
             updateWorkerList();
             updateBuyWorkerButton();
