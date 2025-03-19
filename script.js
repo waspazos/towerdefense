@@ -3824,6 +3824,9 @@ function updateWorkerList() {
 function updateBuyWorkerButton() {
     const buyWorkerBtn = document.getElementById('buy-worker');
     
+    // Update button text to show cost
+    buyWorkerBtn.textContent = `Buy Worker (${gameState.workerCost} Gold)`;
+    
     // Check if there are available rocks
     const availableRocks = scene.children.filter(child => 
         child.userData.type === 'mining-rock' &&
