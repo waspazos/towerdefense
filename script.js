@@ -994,7 +994,7 @@ function generateTowerSlots() {
         { x: -20, z: -17.5 },
         { x: -20, z: -7.5 },
         { x: -20, z: 0 },
-        { x: -10, z: 7 },
+        { x: -7.5, z: 7 },
 
         // Center path slots
         { x: -5, z: 0 },
@@ -1005,7 +1005,7 @@ function generateTowerSlots() {
         { x: 5, z: -17.5 },
 
         // Right path slots
-        { x: 10, z: 7 },
+        { x: 7.5, z: 7 },
         { x: 20, z: 0 },
         { x: 20, z: -17.5 },
         { x: 20, z: -7.5 }
