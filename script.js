@@ -174,6 +174,10 @@ let gameState = {
         swarm: { 
             name: "Swarm", 
             description: "Large numbers of weak enemies" 
+        },
+        boss: {
+            name: "Boss",
+            description: "A powerful enemy that appears every 5 rounds"
         }
     },
     
@@ -183,22 +187,22 @@ let gameState = {
         { type: "armored", difficultly: 1 },
         { type: "swarm", difficultly: 1 },
         { type: "fast", difficultly: 2 },
+        { type: "boss", difficultly: 1 },
         { type: "armored", difficultly: 2 },
         { type: "swarm", difficultly: 2 },
         { type: "fast", difficultly: 3 },
         { type: "armored", difficultly: 3 },
+        { type: "boss", difficultly: 2 },
         { type: "swarm", difficultly: 3 },
         { type: "fast", difficultly: 4 },
         { type: "armored", difficultly: 4 },
         { type: "swarm", difficultly: 4 },
+        { type: "boss", difficultly: 3 },
         { type: "fast", difficultly: 5 },
         { type: "armored", difficultly: 5 },
         { type: "swarm", difficultly: 5 },
         { type: "fast", difficultly: 6 },
-        { type: "armored", difficultly: 6 },
-        { type: "swarm", difficultly: 6 },
-        { type: "fast", difficultly: 7 },
-        { type: "armored", difficultly: 7 }
+        { type: "boss", difficultly: 4 }
     ],
     
     // Define tower types
@@ -405,6 +409,11 @@ function createCreepMesh(creepType = 'standard') {
                 eyeColor = 0x00FFFF;
                 hornColor = 0x660066;
                 break;
+            case 'boss':
+                bodyColor = 0x8B0000; // Dark red for boss
+                eyeColor = 0xFF0000;
+                hornColor = 0x4A0404;
+                break;
             case 'standard':
             default:
                 bodyColor = 0x8B0000; // Original dark red for standard creeps
@@ -510,6 +519,40 @@ function createCreepMesh(creepType = 'standard') {
                     Math.sin(angle) * radius
                 );
                 monsterGroup.add(particle);
+            }
+        }
+
+        if (creepType === 'boss') {
+            // Scale up the entire monster for boss
+            monsterGroup.scale.set(2, 2, 2);
+            
+            // Add glowing aura
+            const auraGeometry = new THREE.RingGeometry(0.8, 1.2, 32);
+            const auraMaterial = new THREE.MeshBasicMaterial({
+                color: 0xFF0000,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+            const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+            aura.rotation.x = Math.PI / 2;
+            aura.position.y = 0.1;
+            monsterGroup.add(aura);
+            
+            // Add spikes
+            const spikeGeometry = new THREE.ConeGeometry(0.1, 0.3, 8);
+            const spikeMaterial = new THREE.MeshStandardMaterial({ color: 0x4A0404 });
+            
+            for (let i = 0; i < 8; i++) {
+                const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
+                const angle = (i / 8) * Math.PI * 2;
+                spike.position.set(
+                    Math.cos(angle) * 0.6,
+                    0.4,
+                    Math.sin(angle) * 0.6
+                );
+                spike.lookAt(0, 0.4, 0);
+                monsterGroup.add(spike);
             }
         }
         
@@ -1568,6 +1611,11 @@ function spawnCreepOnPath(pathIndex) {
                 damage = 1;
                 speed = 2.53;
                 break;
+            case 'boss':
+                health = 500; // Boss has 200 HP
+                damage = 5; // Boss deals more damage
+                speed = 1.5; // Boss moves slower
+                break;
             default:
                 health = 25;
                 damage = 2;
@@ -1605,7 +1653,8 @@ function spawnCreepOnPath(pathIndex) {
         const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        healthBar.position.set(0, 1.2, 0);
+        // Position health bar higher for boss creeps
+        healthBar.position.set(0, creepType === 'boss' ? 2.4 : 1.2, 0);
         healthBar.renderOrder = 1; // Ensure health bar renders on top
         creepMesh.add(healthBar);
         creep.healthBar = healthBar;
@@ -2501,19 +2550,31 @@ function startRound() {
         gameState.timerInterval = null;
     }
     
-    // Calculate number of creeps to spawn
-    const baseCreeps = 5;
-    const roundBonus = Math.min(gameState.currentRound, 10);
-    gameState.creepsToSpawn = baseCreeps + roundBonus;
+    // Calculate number of creeps to spawn based on round type
+    if (currentRoundDef.type === 'boss') {
+        // Boss rounds only spawn one boss
+        gameState.creepsToSpawn = 1;
+    } else {
+        // Regular rounds spawn multiple creeps
+        const baseCreeps = 5;
+        const roundBonus = Math.min(gameState.currentRound, 10);
+        gameState.creepsToSpawn = baseCreeps + roundBonus;
+    }
+    
     console.log("Creeps to spawn:", gameState.creepsToSpawn);
     
     // Spawn creeps with delay
     let spawnCount = 0;
     const spawnInterval = setInterval(() => {
         if (spawnCount < gameState.creepsToSpawn) {
-            // Randomly select a path for this creep
-            const pathIndex = Math.floor(Math.random() * gameState.paths.length);
-            spawnCreepOnPath(pathIndex);
+            // For boss rounds, spawn in the center path
+            if (currentRoundDef.type === 'boss') {
+                spawnCreepOnPath(1); // Center path
+            } else {
+                // Randomly select a path for regular creeps
+                const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+                spawnCreepOnPath(pathIndex);
+            }
             spawnCount++;
             console.log("Spawned creep", spawnCount, "of", gameState.creepsToSpawn);
         } else {
