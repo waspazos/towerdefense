@@ -2541,7 +2541,7 @@ function startRound() {
 }
 
 function endRound() {
-    console.log("Ending round", gameState.currentRound + 1);
+    console.log("Ending round", gameState.currentRound);
     
     // Clear any existing timer
     if (gameState.timerInterval) {
@@ -2555,8 +2555,16 @@ function endRound() {
     // Set round as inactive
     gameState.roundActive = false;
     
-    // Start inter-round timer
-    startInterRoundTimer();
+    // Check if we should show augment selection (Round 6 or game start)
+    if (gameState.currentRound === 6 || gameState.currentRound === 0) {
+        // Pause the game
+        gameState.isPaused = true;
+        // Show augment selection
+        showAugmentSelection();
+    } else {
+        // Start inter-round timer for other rounds
+        startInterRoundTimer();
+    }
 }
 
 function startInterRoundTimer() {
@@ -3365,11 +3373,6 @@ function createFloatingDamageNumber(position, damage, isCritical = false) {
 
 // Function to show augment selection modal
 function showAugmentSelection() {
-    gameState.activeAnimations.push(animateDamageNumber);
-}
-
-// Function to show augment selection modal
-function showAugmentSelection() {
     const modal = document.getElementById('augment-modal');
     const options = modal.querySelectorAll('.augment-option');
     
@@ -3413,11 +3416,17 @@ function selectAugment(augment) {
         gameState.towers.forEach(tower => augment.effect(tower));
     }
     
+    // Update the augment tracker
+    updateAugmentTracker();
+    
     // Hide the modal
     document.getElementById('augment-modal').classList.add('hidden');
     
-    // Start the round
-    startRound();
+    // Unpause the game
+    gameState.isPaused = false;
+    
+    // Start the inter-round timer
+    startInterRoundTimer();
 }
 
 // Function to reset round-specific augments
@@ -3428,6 +3437,9 @@ function resetRoundAugments() {
             augment.reset(tower);
         }
     });
+    
+    // Update the augment tracker after resetting
+    updateAugmentTracker();
 }
 
 // Function to update the augment tracker UI
@@ -3471,39 +3483,4 @@ function updateAugmentTracker() {
             augmentList.appendChild(augmentItem);
         }
     });
-}
-
-// Function to handle augment selection
-function selectAugment(augment) {
-    // Add augment to active augments
-    gameState.activeAugments.push(augment.id);
-    
-    // Apply the augment effect
-    if (augment.id === 'golden-towers') {
-        augment.effect();
-    } else {
-        gameState.towers.forEach(tower => augment.effect(tower));
-    }
-    
-    // Update the augment tracker
-    updateAugmentTracker();
-    
-    // Hide the modal
-    document.getElementById('augment-modal').classList.add('hidden');
-    
-    // Start the round
-    startRound();
-}
-
-// Function to reset round-specific augments
-function resetRoundAugments() {
-    gameState.towers.forEach(tower => {
-        if (gameState.activeAugments.includes('towers-of-rage')) {
-            const augment = gameState.availableAugments.find(a => a.id === 'towers-of-rage');
-            augment.reset(tower);
-        }
-    });
-    
-    // Update the augment tracker after resetting
-    updateAugmentTracker();
 }
