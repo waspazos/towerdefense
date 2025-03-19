@@ -451,3 +451,96 @@ body {
     font-size: 0.8em;
     color: #ccc;
 }
+
+/* Augment Modal Styles */
+.augment-content {
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 30px;
+    border-radius: 15px;
+    width: 800px;
+    max-width: 90vw;
+    color: white;
+}
+
+.augment-content h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #ffd700;
+    font-size: 2em;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.augment-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.augment-option {
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.augment-option:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.augment-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+.rage-icon {
+    background: linear-gradient(135deg, #ff4500, #ff0000);
+    box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
+}
+
+.catapult-icon {
+    background: linear-gradient(135deg, #8b4513, #654321);
+    box-shadow: 0 0 20px rgba(139, 69, 19, 0.5);
+}
+
+.bloodbath-icon {
+    background: linear-gradient(135deg, #800000, #ff0000);
+    box-shadow: 0 0 20px rgba(128, 0, 0, 0.5);
+}
+
+.hellfire-icon {
+    background: linear-gradient(135deg, #ff8c00, #ff4500);
+    box-shadow: 0 0 20px rgba(255, 140, 0, 0.5);
+}
+
+.golden-icon {
+    background: linear-gradient(135deg, #ffd700, #daa520);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+
+.augment-info {
+    width: 100%;
+}
+
+.augment-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #ffd700;
+}
+
+.augment-description {
+    font-size: 0.9em;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}

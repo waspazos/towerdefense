@@ -224,7 +224,58 @@ let gameState = {
                 { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.4, critMultiplier: 1.5, color: 0xff0000 }
             ]
         }
-    }
+    },
+    activeAugments: [],
+    availableAugments: [
+        {
+            id: 'towers-of-rage',
+            name: 'Towers of Rage',
+            description: 'Towers gain 1% attack speed each time they attack (resets each round)',
+            effect: (tower) => {
+                tower.attackSpeed *= 1.01;
+            },
+            reset: (tower) => {
+                tower.attackSpeed = gameState.towerTypes[tower.type].ranks[tower.rank - 1].attackSpeed;
+            }
+        },
+        {
+            id: 'catapult',
+            name: 'Catapult',
+            description: 'All towers have +2 range',
+            effect: (tower) => {
+                tower.range += 2;
+                if (tower.rangeIndicator) {
+                    scene.remove(tower.rangeIndicator);
+                    tower.rangeIndicator = createRangeIndicator(tower.position, tower.range);
+                    scene.add(tower.rangeIndicator);
+                }
+            }
+        },
+        {
+            id: 'bloodbath',
+            name: 'Bloodbath',
+            description: 'All towers have 15% crit chance (+15% for Fire Towers)',
+            effect: (tower) => {
+                tower.critChance = tower.type === 'fire' ? 0.3 : 0.15;
+            }
+        },
+        {
+            id: 'hellfire',
+            name: 'Hellfire',
+            description: 'Tower attacks apply burn effect (5% health/2s)',
+            effect: (tower) => {
+                tower.burnEffect = true;
+            }
+        },
+        {
+            id: 'golden-towers',
+            name: 'Golden Towers',
+            description: '+1 gold per creep kill',
+            effect: () => {
+                gameState.goldPerKill += 1;
+            }
+        }
+    ]
 };
 
 // Three.js variables
@@ -240,59 +291,60 @@ function initGame() {
     const savedTowerTypes = {...gameState.towerTypes};
     
     // Reset game state
-    gameState.kingHealth = 100;
     gameState.gold = 10;
+    gameState.kingHealth = 100;
+    gameState.currentRound = 0;
+    gameState.towers = [];
+    gameState.creeps = [];
+    gameState.projectiles = [];
     gameState.towerCount = 0;
     gameState.totalDamage = 0;
-    gameState.currentRound = 0;
+    gameState.towersBuilt = 0;
+    gameState.selectedTower = null;
+    gameState.selectedTowerSlot = null;
+    gameState.activeAnimations = [];
+    gameState.isPaused = false;
+    gameState.goldPerKill = 1;
+    gameState.activeAugments = [];
     gameState.gameActive = true;
     gameState.roundActive = false;
     gameState.interRoundTimer = 10;
-    gameState.isPaused = false;
-    gameState.creeps = [];
-    gameState.towers = [];
-    gameState.projectiles = [];
-    gameState.selectedTowerSlot = null;
-    gameState.selectedTower = null;
-    gameState.creepsKilled = 0;
-    gameState.towersBuilt = 0;
     
     // Initialize the paths array
     gameState.paths = [
         // Left path
         { 
-            spawnPoint: { x: -15, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(-15, 0, -25),
             waypoints: [
-                { x: -15, y: 0, z: -25 },
-                { x: -15, y: 0, z: -10 },
-                { x: -15, y: 0, z: 0 },
-                { x: -10, y: 0, z: 5 },
-                { x: -5, y: 0, z: 7 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(-15, 0, -25),
+                new THREE.Vector3(-15, 0, -10),
+                new THREE.Vector3(-15, 0, 0),
+                new THREE.Vector3(-10, 0, 5),
+                new THREE.Vector3(-5, 0, 7),
+                new THREE.Vector3(0, 0, 10)
             ]
         },
         // Center path
         {
-            spawnPoint: { x: 0, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(0, 0, -25),
             waypoints: [
-                { x: 0, y: 0, z: -25 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(0, 0, -25),
+                new THREE.Vector3(0, 0, 10)
             ]
         },
         // Right path
         {
-            spawnPoint: { x: 15, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(15, 0, -25),
             waypoints: [
-                { x: 15, y: 0, z: -25 },
-                { x: 15, y: 0, z: -10 },
-                { x: 15, y: 0, z: 0 },
-                { x: 10, y: 0, z: 5 },
-                { x: 5, y: 0, z: 7 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(15, 0, -25),
+                new THREE.Vector3(15, 0, -10),
+                new THREE.Vector3(15, 0, 0),
+                new THREE.Vector3(10, 0, 5),
+                new THREE.Vector3(5, 0, 7),
+                new THREE.Vector3(0, 0, 10)
             ]
         }
     ];
-    
     
     // Restore tower types
     gameState.towerTypes = savedTowerTypes;
@@ -313,8 +365,8 @@ function initGame() {
     // Start game loop
     animate();
     
-    // Start timer for first round
-    startInterRoundTimer();
+    // Show augment selection at game start
+    showAugmentSelection();
 }
 
 // Create creep mesh without using CapsuleGeometry
@@ -1220,6 +1272,17 @@ function animate() {
         updateCreeps(safeDelta);
         updateProjectiles(safeDelta);
         updateCriticalHitParticles(safeDelta);
+        
+        // Update animations
+        if (gameState.activeAnimations) {
+            for (let i = gameState.activeAnimations.length - 1; i >= 0; i--) {
+                const animation = gameState.activeAnimations[i];
+                const continueAnimation = animation(safeDelta);
+                if (!continueAnimation) {
+                    gameState.activeAnimations.splice(i, 1);
+                }
+            }
+        }
     }
     
     // Always render the scene (even when paused)
@@ -1269,35 +1332,37 @@ function spawnCreep() {
         // Set type-specific properties
         let health, damage, speed;
         
-        // Base values scaled by round difficulty
-        const difficultyMultiplier = Math.pow(1.15, gameState.currentRound - 1);
-        const roundDifficulty = roundDef.difficultly;
-        
+        // Base values without any multipliers for round 1
         switch(creepType) {
             case 'fast':
-                health = 20 * difficultyMultiplier;
+                health = 15;
                 damage = 2;
-                speed = 3; // Faster movement
+                speed = 3;
                 break;
             case 'armored':
-                health = 45 * difficultyMultiplier;
+                health = 35;
                 damage = 2;
-                speed = 1.5; // Slower but more health
+                speed = 1.5;
                 break;
             case 'swarm':
-                health = 15 * difficultyMultiplier;
-                damage = 1; // Less damage individually
+                health = 10;
+                damage = 1;
                 speed = 2.2;
                 break;
             default:
-                // Fallback (shouldn't occur with the new system)
-                health = 30 * difficultyMultiplier;
+                health = 25;
                 damage = 2;
                 speed = 2;
                 break;
         }
         
-        // Add to game state
+        // Only apply difficulty scaling if we're past round 1
+        if (gameState.currentRound > 1) {
+            const difficultyMultiplier = Math.pow(1.1, gameState.currentRound - 1);
+            health = Math.round(health * difficultyMultiplier);
+        }
+        
+        // Add to game state with all required properties
         const creep = {
             mesh: creepMesh,
             position: { x: spawnPoint.x, y: spawnPoint.y, z: spawnPoint.z },
@@ -1306,12 +1371,17 @@ function spawnCreep() {
             maxHealth: health,
             baseSpeed: speed,
             speed: speed,
-            slowEffects: [],
+            slowEffects: [], // Initialize empty array for slow effects
+            effects: {
+                slow: [],
+                burn: null
+            },
             reachedKing: false,
             damageToKing: damage,
             creepType: creepType,
-            pathIndex: pathIndex, // Store which path this creep is following
-            waypointIndex: 0      // Track current waypoint target
+            pathIndex: pathIndex,
+            path: path,
+            currentWaypoint: 0
         };
         
         // Create health bar and attach it to the monster
@@ -1343,85 +1413,95 @@ function spawnCreep() {
         };
         
         gameState.creeps.push(creep);
+        console.log("Creep spawned successfully:", creep);
     } catch (error) {
-        console.log("Error spawning creep:", error);
+        console.error("Error spawning creep:", error);
     }
 }
 
 // Function to spawn a creep on a specific path
 function spawnCreepOnPath(pathIndex) {
     try {
+        const path = gameState.paths[pathIndex];
+        if (!path) {
+            console.error("Invalid path index:", pathIndex);
+            return;
+        }
+
         // Get the current round definition
         const roundIndex = gameState.currentRound - 1;
         const roundDef = gameState.roundDefinitions[roundIndex];
-        
-        // Use the type directly from the round definition
-        let creepType = roundDef.type;
-        
-        // Get the specified path
-        const path = gameState.paths[pathIndex];
-        const spawnPoint = path.spawnPoint;
-        
-        // Create 3D mesh with the appropriate type
+        const creepType = roundDef.type;
+
+        // Create creep mesh with the correct type
         const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.set(spawnPoint.x, 1, spawnPoint.z); // Raised Y position to 1
+        creepMesh.position.copy(path.waypoints[0]);
         scene.add(creepMesh);
         
         // Set type-specific properties
         let health, damage, speed;
         
-        // Base values scaled by round difficulty
-        const difficultyMultiplier = Math.pow(1.15, gameState.currentRound - 1);
-        const roundDifficulty = roundDef.difficultly;
-        
+        // Base values without any multipliers for round 1
         switch(creepType) {
             case 'fast':
-                health = 20 * difficultyMultiplier;
+                health = 15;
                 damage = 2;
-                speed = 3; // Faster movement
+                speed = 3;
                 break;
             case 'armored':
-                health = 45 * difficultyMultiplier;
+                health = 35;
                 damage = 2;
-                speed = 1.5; // Slower but more health
+                speed = 1.5;
                 break;
             case 'swarm':
-                health = 15 * difficultyMultiplier;
-                damage = 1; // Less damage individually
+                health = 10;
+                damage = 1;
                 speed = 2.2;
                 break;
             default:
-                health = 30 * difficultyMultiplier;
+                health = 25;
                 damage = 2;
                 speed = 2;
                 break;
         }
         
-        // Add to game state
+        // Only apply difficulty scaling if we're past round 1
+        if (gameState.currentRound > 1) {
+            const difficultyMultiplier = Math.pow(1.1, gameState.currentRound - 1);
+            health = Math.round(health * difficultyMultiplier);
+        }
+        
+        // Create creep object with type-specific properties
         const creep = {
             mesh: creepMesh,
-            position: { x: spawnPoint.x, y: 1, z: spawnPoint.z }, // Raised Y position to 1
+            position: { x: path.waypoints[0].x, y: path.waypoints[0].y, z: path.waypoints[0].z },
             progress: 0,
             health: health,
             maxHealth: health,
             baseSpeed: speed,
             speed: speed,
-            slowEffects: [],
+            slowEffects: [], // Initialize empty array for slow effects
+            effects: {
+                slow: [],
+                burn: null
+            },
             reachedKing: false,
             damageToKing: damage,
             creepType: creepType,
-            pathIndex: pathIndex, // Store which path this creep is following
-            waypointIndex: 0      // Track current waypoint target
+            pathIndex: pathIndex,
+            path: path,
+            currentWaypoint: 0
         };
-        
-        // Create health bar and attach it to the monster
+
+        // Add health bar
         const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        creep.healthBar.position.set(0, 1.2, 0);
-        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
-        creepMesh.add(creep.healthBar);
-        
+        const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+        healthBar.position.set(0, 1.2, 0);
+        healthBar.renderOrder = 1; // Ensure health bar renders on top
+        creepMesh.add(healthBar);
+        creep.healthBar = healthBar;
+
         // Add billboard behavior to make health bar always face camera
         creep.healthBar.update = function() {
             // Get the creep's position
@@ -1441,10 +1521,12 @@ function spawnCreepOnPath(pathIndex) {
             this.rotation.x = 0;
             this.rotation.z = 0;
         };
-        
+
+        // Add to game state
         gameState.creeps.push(creep);
+        console.log("Creep spawned successfully. Total creeps:", gameState.creeps.length);
     } catch (error) {
-        console.log("Error spawning creep on path:", pathIndex, error);
+        console.error("Error spawning creep on path:", error);
     }
 }
 
@@ -1658,190 +1740,80 @@ function updateCreepSpeed(creep) {
 
 // Update creeps
 function updateCreeps(delta) {
-    const creepsToRemove = [];
-    
-    gameState.creeps.forEach((creep, index) => {
-        if (creep.reachedKing) {
-            // Apply damage based on creep type
-            gameState.kingHealth -= creep.damageToKing;
-            updateKingHealth();
-            
-            if (gameState.kingHealth <= 0) {
-                gameState.gameActive = false;
-                showGameOverScreen(false);
-            }
-            
-            creepsToRemove.push(creep);
+    // Skip update if no creeps
+    if (!gameState.creeps || gameState.creeps.length === 0) {
             return;
         }
         
-        // Get current path and waypoints
-        const path = gameState.paths[creep.pathIndex];
-        const waypoints = path.waypoints;
-        
-        // Current and next waypoint
-        const currentWaypoint = waypoints[creep.waypointIndex];
-        const nextWaypoint = waypoints[creep.waypointIndex + 1];
-        
-        // If reached final waypoint, mark as reached king
-        if (!nextWaypoint) {
-            creep.reachedKing = true;
-            
-            // Apply damage based on creep type
-            gameState.kingHealth -= creep.damageToKing;
-            updateKingHealth();
-            
-            if (gameState.kingHealth <= 0) {
-                gameState.gameActive = false;
-                showGameOverScreen(false);
-            }
-            
-            creepsToRemove.push(creep);
-            return;
-        }
-        
-        // Calculate direction to next waypoint
-        const dx = nextWaypoint.x - currentWaypoint.x;
-        const dz = nextWaypoint.z - currentWaypoint.z;
-        const distance = Math.sqrt(dx * dx + dz * dz);
-        
-        // Update position based on speed and delta time
-        creep.progress += (creep.speed * delta) / distance;
-        
-        // If reached next waypoint, advance to next segment
-        if (creep.progress >= 1) {
-            creep.waypointIndex++;
-            creep.progress = 0;
-            
-            // If no more waypoints, mark as reached king
-            if (creep.waypointIndex >= waypoints.length - 1) {
-                creep.reachedKing = true;
-                
-                // Apply damage based on creep type
-                gameState.kingHealth -= creep.damageToKing;
-                updateKingHealth();
-                
-                if (gameState.kingHealth <= 0) {
-                    gameState.gameActive = false;
-                    showGameOverScreen(false);
-                }
-                
-                creepsToRemove.push(creep);
-                return;
-            }
-        } else {
-            // Calculate interpolated position between waypoints
-            const newX = currentWaypoint.x + dx * creep.progress;
-            const newZ = currentWaypoint.z + dz * creep.progress;
-            
-            // Update position while maintaining height
-            creep.position.x = newX;
-            creep.position.y = 1; // Maintain raised height
-            creep.position.z = newZ;
-            creep.mesh.position.set(newX, 1, newZ); // Maintain raised height
-            
-            // Update mesh rotation to face movement direction
-            const angle = Math.atan2(dz, dx);
-            creep.mesh.rotation.y = angle;
-        }
-        
-        // Apply bobbing animation while maintaining base height
-        creep.mesh.position.y = 1 + Math.sin(clock.elapsedTime * 5) * 0.1;
-        
-        // Special animation for swarm type - rotate particles
-        if (creep.creepType === 'swarm') {
-            creep.mesh.children.forEach(child => {
-                // Only animate the particle spheres (not arms, legs, etc.)
-                if (child.geometry && child.geometry.type === 'SphereGeometry' && 
-                    child.geometry.parameters.radius === 0.05) {
-                    child.position.x = Math.cos(clock.elapsedTime * 2 + child.position.y * 10) * 0.3;
-                    child.position.z = Math.sin(clock.elapsedTime * 2 + child.position.y * 10) * 0.3;
-                }
-            });
-        }
-        
-        // Simple animation if userData exists
-        try {
-            if (creep.mesh.userData) {
-                // Existing animation code...
-                creep.mesh.userData.walkTime += delta;
-                const walkTime = creep.mesh.userData.walkTime;
-                
-                // Animate arms
-                if (creep.mesh.userData.armSwing) {
-                    if (creep.mesh.userData.armSwing.left) {
-                        creep.mesh.userData.armSwing.left.rotation.x = Math.sin(walkTime * 5) * 0.4;
-                    }
-                    if (creep.mesh.userData.armSwing.right) {
-                        creep.mesh.userData.armSwing.right.rotation.x = -Math.sin(walkTime * 5) * 0.4;
-                    }
-                }
-                
-                // Animate legs
-                if (creep.mesh.userData.legSwing) {
-                    if (creep.mesh.userData.legSwing.left) {
-                        creep.mesh.userData.legSwing.left.rotation.x = Math.sin(walkTime * 5) * 0.4;
-                    }
-                    if (creep.mesh.userData.legSwing.right) {
-                        creep.mesh.userData.legSwing.right.rotation.x = -Math.sin(walkTime * 5) * 0.4;
-                    }
-                }
-            }
-        } catch (animError) {
-            // Silent error handling for animations
-        }
-        
-        // Update health bar
-        if (creep.healthBar) {
-            const healthPercent = creep.health / creep.maxHealth;
-            creep.healthBar.scale.x = Math.max(0.1, healthPercent);
-            
-            if (healthPercent > 0.5) {
-                creep.healthBar.material.color.setHex(0x00ff00);
-            } else if (healthPercent > 0.25) {
-                creep.healthBar.material.color.setHex(0xffff00);
+    // Update burn effect
+    gameState.creeps.forEach(creep => {
+        if (creep.effects && creep.effects.burn) {
+            creep.effects.burn.timeRemaining -= delta;
+            if (creep.effects.burn.timeRemaining <= 0) {
+                creep.effects.burn = null;
             } else {
-                creep.healthBar.material.color.setHex(0xff0000);
+                creep.health -= creep.effects.burn.damagePerSecond * delta;
+                if (creep.health <= 0) {
+                    // Creep died from burn
+                    gameState.gold += 5;
+                    updateGold();
+                    scene.remove(creep.mesh);
+                    const index = gameState.creeps.indexOf(creep);
+                    if (index > -1) {
+                        gameState.creeps.splice(index, 1);
+                    }
+                    console.log("Creep died from burn. Remaining creeps:", gameState.creeps.length);
+                }
             }
+        }
+    });
 
-            // Update health bar orientation to face camera
-            if (typeof creep.healthBar.update === 'function') {
-                creep.healthBar.update();
-            }
-        }
-        
-        if (creep.health <= 0) {
-            creepsToRemove.push(creep);
-            
-            // Gold reward based on creep type
-            let goldReward = 1;
-            if (creep.creepType === 'armored') goldReward = 2;
-            if (creep.creepType === 'fast') goldReward = 1;
-            if (creep.creepType === 'swarm') goldReward = 1;
-            
-            gameState.gold += goldReward;
-            gameState.creepsKilled++;
-            updateGold();
-        }
-        
-        // Update slow effects
-        updateCreepSlowEffects(creep, delta);
-        
-        // Call custom update function if it exists
-        if (typeof creep.update === 'function') {
-            creep.update(delta);
+    // Update slow effects and creep speed
+    gameState.creeps.forEach(creep => {
+        if (creep.slowEffects) {
+            updateCreepSlowEffects(creep, delta);
+            updateCreepSpeed(creep);
         }
     });
-    
-    creepsToRemove.forEach(creep => {
-        const index = gameState.creeps.indexOf(creep);
-        if (index !== -1) {
+
+    // Move creeps along their paths
+    for (let i = gameState.creeps.length - 1; i >= 0; i--) {
+        const creep = gameState.creeps[i];
+        
+        if (!creep.path || !creep.path.waypoints) {
+            console.error("Creep has invalid path:", creep);
+            continue;
+        }
+
+        const currentWaypoint = creep.path.waypoints[creep.currentWaypoint];
+        const nextWaypoint = creep.path.waypoints[creep.currentWaypoint + 1];
+
+        if (!nextWaypoint) {
+            // Creep reached the king
+            gameState.kingHealth -= creep.damageToKing;
+            updateKingHealth();
             scene.remove(creep.mesh);
-            gameState.creeps.splice(index, 1);
+            gameState.creeps.splice(i, 1);
+            console.log("Creep reached king. Remaining creeps:", gameState.creeps.length);
+            continue;
         }
-    });
-    
+
+        const direction = nextWaypoint.clone().sub(currentWaypoint);
+        const distance = direction.length();
+        direction.normalize();
+
+        const movement = direction.multiplyScalar(creep.speed * delta);
+        creep.mesh.position.add(movement);
+
+        // Check if reached waypoint
+        if (creep.mesh.position.distanceTo(nextWaypoint) < 0.1) {
+            creep.currentWaypoint++;
+        }
+    }
+
+    // Check if round should end (all creeps killed)
     if (gameState.roundActive && gameState.creeps.length === 0) {
+        console.log("All creeps killed, ending round");
         endRound();
     }
 }
@@ -1993,51 +1965,20 @@ function buildTower(towerType) {
     
     // Check if slot is selected
     if (!gameState.selectedTowerSlot) {
-        console.log("No tower slot selected");
+        console.error("No tower slot selected");
         return;
     }
     
-    // Remove range indicator if present - make sure it's completely removed
+    // Remove range indicator if present
     if (gameState.towerSlotRangeIndicator) {
         scene.remove(gameState.towerSlotRangeIndicator);
         gameState.towerSlotRangeIndicator = null;
     }
     
-    // Get tower data - debugging output
-    console.log("Tower types:", gameState.towerTypes);
-    
-    // Define tower types if missing
-    if (!gameState.towerTypes) {
-        console.log("Tower types not defined, creating defaults");
-        gameState.towerTypes = {
-            basic: {
-                name: "Basic Tower",
-                ranks: [
-                    { cost: 3, damage: 25, attackSpeed: 2, color: 0xaaaaaa },
-                    { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd }
-                ]
-            },
-            frost: {
-                name: "Frost Tower",
-                ranks: [
-                    { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
-                    { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
-                ]
-            },
-            fire: {
-                name: "Fire Tower",
-                ranks: [
-                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.2, critMultiplier: 1.5, color: 0xff4500 },
-                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.2, critMultiplier: 1.5, color: 0xff0000 }
-                ]
-            }
-        };
-    }
-    
+    // Get tower data
     const towerData = gameState.towerTypes[towerType];
-    
     if (!towerData) {
-        console.error("Tower type not found:", towerType);
+        console.error("Invalid tower type:", towerType);
         return;
     }
     
@@ -2045,7 +1986,7 @@ function buildTower(towerType) {
     
     // Check if we have enough gold
     if (gameState.gold < towerRank.cost) {
-        console.log("Not enough gold");
+        console.error("Not enough gold to build tower");
         return;
     }
     
@@ -2053,12 +1994,13 @@ function buildTower(towerType) {
     const slot = gameState.selectedTowerSlot;
     console.log("Building tower at slot:", slot);
     
+    try {
     // Create tower mesh
     const towerMesh = createTowerMesh(towerType, 1);
-    towerMesh.position.set(slot.x, slot.y + 1, slot.z); // Position at slot
+        towerMesh.position.set(slot.x, slot.y + 1, slot.z);
     scene.add(towerMesh);
     
-    // Create tower object with properties based on tower type
+        // Create tower object
     const tower = {
         mesh: towerMesh,
         type: towerType,
@@ -2101,192 +2043,176 @@ function buildTower(towerType) {
     
     // Hide tower selection
     document.getElementById('tower-selection').classList.add('hidden');
+        document.getElementById('tower-selection-backdrop').classList.add('hidden');
     gameState.selectedTowerSlot = null;
     
     console.log("Tower built successfully:", tower);
+    } catch (error) {
+        console.error("Error building tower:", error);
+    }
 }
 
 // Update towers
 function updateTowers(delta) {
     gameState.towers.forEach(tower => {
-        // Decrease attack cooldown
-        if (tower.attackCooldown > 0) {
-            tower.attackCooldown -= delta;
-        }
+        // Update attack cooldown
+        tower.attackCooldown += delta;
         
-        // Find targets if needed
-        if (!tower.targetCreep || tower.targetCreep.length === 0 || 
-            tower.targetCreep.some(target => target.health <= 0 || target.reachedKing) || 
-            tower.targetCreep.some(target => getDistance3D(tower.position, target.position) > tower.range)) {
-            tower.targetCreep = findTarget(tower);
-        }
-        
-        // Face the turret towards the first target
-        if (tower.targetCreep && tower.targetCreep.length > 0) {
-            const turret = tower.mesh.children[0];
-            const targetPos = tower.targetCreep[0].position;
+        // Check if tower can attack
+        if (tower.attackCooldown >= tower.attackSpeed) {
+            // Find target(s)
+            const targets = findTarget(tower);
             
-            // Calculate direction to target
-            const dx = targetPos.x - tower.position.x;
-            const dz = targetPos.z - tower.position.z;
-            const angle = Math.atan2(dz, dx);
-            
-            // Rotate the tower base
-            tower.mesh.rotation.y = angle + Math.PI / 2;
-        }
-        
-        // Attack if ready and has targets
-        if (tower.attackCooldown <= 0 && tower.targetCreep && tower.targetCreep.length > 0) {
-            console.log("Tower firing:", tower.type, "Targets:", tower.targetCreep.length); // Debug log
-            
-            // For basic towers, always fire at least one projectile
-            if (tower.type === 'basic') {
-                // Fire at first target with full damage
-                fireProjectile(tower, tower.targetCreep[0], 1);
-                
-                // If there's a second target, fire at it with 50% damage
-                if (tower.targetCreep.length > 1) {
-                    console.log("Firing second projectile with 50% damage"); // Debug log
-                    fireProjectile(tower, tower.targetCreep[1], 0.5);
+            if (targets) {
+                // Handle both single target and multi-target cases
+                if (Array.isArray(targets)) {
+                    // Multi-target (basic tower)
+                    // First target takes full damage
+                    fireProjectile(tower, targets[0], 1.0);
+                    // Second target takes 50% damage
+                    if (targets[1]) {
+                        fireProjectile(tower, targets[1], 0.5);
+                    }
+                } else {
+                    // Single target (other towers)
+                    fireProjectile(tower, targets);
                 }
-            } else {
-                // For other towers, fire at single target
-                fireProjectile(tower, tower.targetCreep[0], 1);
+                
+                // Reset attack cooldown
+                tower.attackCooldown = 0;
             }
-            
-            // Reset cooldown
-            tower.attackCooldown = tower.attackSpeed;
         }
     });
 }
 
 // 5. Fire projectile with proper color and effects
 function fireProjectile(tower, target, damageMultiplier = 1) {
-    // Determine projectile color based on tower type and rank
-    let projectileColor;
+    // Safety check for target and its mesh
+    if (!target || !target.mesh || !target.mesh.position) {
+        console.log("No valid target for projectile - missing mesh or position");
+        return;
+    }
+
+    // Calculate damage with augment effects
+    let damage = gameState.towerTypes[tower.type].ranks[tower.rank - 1].damage * damageMultiplier;
+    let isCritical = false;
     
-    if (tower.type === 'frost') {
-        // Frost tower has blue projectiles
-        projectileColor = tower.rank === 1 ? 0x6495ED : 0x1E90FF;
-    } else if (tower.type === 'fire') {
-        // Fire tower has red projectiles
-        projectileColor = tower.rank === 1 ? 0xff4500 : 0xff0000;
-    } else {
-        // Basic tower has gray projectiles
-        projectileColor = tower.rank === 1 ? 0xaaaaaa : 0xdddddd;
+    // Apply Bloodbath augment if active
+    if (gameState.activeAugments.includes('bloodbath')) {
+        const critChance = tower.type === 'fire' ? 0.3 : 0.15;
+        if (Math.random() < critChance) {
+            const critMultiplier = tower.type === 'fire' ? 1.65 : 1.5;
+            damage *= critMultiplier;
+            isCritical = true;
+        }
     }
     
-    // Create projectile mesh
-    const projectileMesh = createProjectileMesh(projectileColor);
-    
-    // Offset the projectile position slightly for multiple targets
-    const offset = Math.random() * 0.2 - 0.1; // Random offset between -0.1 and 0.1
-    projectileMesh.position.copy(tower.position);
-    projectileMesh.position.y += 0.5; // Start at turret height
-    projectileMesh.position.x += offset; // Add random offset
-    projectileMesh.position.z += offset; // Add random offset
-    
-    scene.add(projectileMesh);
-    
-    // Create projectile object
+    // Create projectile
     const projectile = {
-        mesh: projectileMesh,
-        position: { 
-            x: projectileMesh.position.x,
-            y: projectileMesh.position.y,
-            z: projectileMesh.position.z
-        },
+        mesh: createProjectileMesh(gameState.towerTypes[tower.type].ranks[tower.rank - 1].color),
         target: target,
-        speed: 15, // Units per second
-        damage: tower.damage * damageMultiplier,
-        type: tower.type,
-        towerRank: tower.rank,
-        slowEffect: tower.type === 'frost' ? tower.slowEffect : 0,
-        critChance: tower.type === 'fire' ? tower.critChance : 0,
-        critMultiplier: tower.type === 'fire' ? tower.critMultiplier : 1,
-        reached: false
+        damage: damage,
+        speed: 15,
+        position: { 
+            x: tower.position.x, 
+            y: tower.position.y + 1, 
+            z: tower.position.z 
+        },
+        direction: { x: 0, y: 0, z: 0 },
+        reached: false,
+        isCritical: isCritical,
+        type: tower.type
     };
     
+    // Calculate direction to target using mesh position
+    const dx = target.mesh.position.x - tower.position.x;
+    const dy = target.mesh.position.y - tower.position.y;
+    const dz = target.mesh.position.z - tower.position.z;
+    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    
+    if (distance === 0) {
+        console.log("Target is at same position as tower, skipping projectile");
+        return;
+    }
+    
+    projectile.direction.x = dx / distance;
+    projectile.direction.y = dy / distance;
+    projectile.direction.z = dz / distance;
+    
+    // Position projectile at tower
+    projectile.mesh.position.set(
+        projectile.position.x,
+        projectile.position.y,
+        projectile.position.z
+    );
+    
+    // Add to scene and game state
+    scene.add(projectile.mesh);
     gameState.projectiles.push(projectile);
+    
+    // Apply Towers of Rage augment if active
+    if (gameState.activeAugments.includes('towers-of-rage')) {
+        tower.attackSpeed *= 1.05;
+    }
 }
 
 // 6. Update projectiles to apply slow effect on hit
 function updateProjectiles(delta) {
     const projectilesToRemove = [];
     
-    // Animate existing projectiles (especially frost ones)
     gameState.projectiles.forEach(projectile => {
-        // Rotate and animate frost projectiles
-        if (projectile.type === 'frost' && projectile.mesh.userData) {
-            // Rotate the projectile group
-            projectile.mesh.rotation.z += projectile.mesh.userData.rotationSpeed;
-            
-            // Pulse effect
-            projectile.mesh.userData.pulseTime += delta * 5;
-            const pulse = Math.sin(projectile.mesh.userData.pulseTime) * 0.2 + 1;
-            
-            // Apply pulse to core (second child in the group)
-            if (projectile.mesh.children.length > 1) {
-                projectile.mesh.children[1].scale.set(pulse, pulse, pulse);
-            }
-        }
-        
-        if (projectile.reached || !projectile.target) {
+        if (projectile.reached) {
             projectilesToRemove.push(projectile);
             return;
         }
         
-        // Calculate direction to target
-        const targetPos = projectile.target.position;
-        const dx = targetPos.x - projectile.position.x;
-        const dy = targetPos.y - projectile.position.y;
-        const dz = targetPos.z - projectile.position.z;
-        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        // Safety check for target and its mesh
+        if (!projectile.target || !projectile.target.mesh || !projectile.target.mesh.position) {
+            console.warn("Invalid target for projectile:", projectile.target);
+            projectilesToRemove.push(projectile);
+            return;
+        }
         
-        // Mark as reached if close enough
+        // Calculate distance to target using mesh position
+        const dx = projectile.target.mesh.position.x - projectile.position.x;
+        const dy = projectile.target.mesh.position.y - projectile.position.y;
+        const dz = projectile.target.mesh.position.z - projectile.position.z;
+        const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        // Check if projectile hit target
         if (distance < 0.5) {
-            let finalDamage = projectile.damage;
-            let isCritical = false;
+            // Apply damage
+            const damage = Math.round(projectile.damage);
+            projectile.target.health -= damage;
             
-            // Check for critical hit on Fire Tower projectiles
-            if (projectile.type === 'fire' && Math.random() < projectile.critChance) {
-                finalDamage = projectile.damage * projectile.critMultiplier;
-                isCritical = true;
-                
-                // Create and add fire critical hit animation
-                const impactAnimation = createFireCriticalEffect(projectile.target.position);
-                
-                // Add to animation system
-                if (!gameState.activeAnimations) {
-                    gameState.activeAnimations = [];
-                }
-                gameState.activeAnimations.push(impactAnimation);
+            // Update health bar
+            if (projectile.target.healthBar) {
+                const healthPercent = Math.max(0, projectile.target.health / projectile.target.maxHealth);
+                projectile.target.healthBar.scale.x = Math.max(0.01, healthPercent);
+                projectile.target.healthBar.material.color.setHex(
+                    healthPercent > 0.6 ? 0x00ff00 :
+                    healthPercent > 0.3 ? 0xffff00 : 0xff0000
+                );
             }
             
-            // Apply the damage
-            projectile.target.health -= finalDamage;
-            gameState.totalDamage += finalDamage;
-            updateTotalDamage();
+            // Create floating damage number
+            createFloatingDamageNumber(projectile.position, damage, projectile.isCritical);
             
-            // Show floating damage number
-            createFloatingDamageNumber(projectile.target.position, Math.floor(finalDamage), isCritical);
-            
-            // Create impact effect for frost towers
-            if (projectile.type === 'frost' && projectile.slowEffect > 0) {
-                // Apply slowing effect
-                applySlowEffect(projectile.target, projectile.slowEffect, projectile.towerRank);
+            // Remove creep if dead
+            if (projectile.target.health <= 0) {
+                // Add gold for kill
+                gameState.gold += gameState.goldPerKill;
+                updateGold();
                 
-                // Create and add frost impact animation
-                const impactAnimation = createFrostImpactEffect(projectile.target.position);
-                
-                // Add to animation system
-                if (!gameState.activeAnimations) {
-                    gameState.activeAnimations = [];
+                // Remove creep from scene and game state
+                scene.remove(projectile.target.mesh);
+                const creepIndex = gameState.creeps.indexOf(projectile.target);
+                if (creepIndex > -1) {
+                    gameState.creeps.splice(creepIndex, 1);
                 }
-                gameState.activeAnimations.push(impactAnimation);
             }
             
-            // Mark for removal
+            // Mark projectile for removal
             projectile.reached = true;
             projectilesToRemove.push(projectile);
             return;
@@ -2307,45 +2233,37 @@ function updateProjectiles(delta) {
             projectile.position.y,
             projectile.position.z
         );
-        
-        // Make frost projectiles face the direction of travel
-        if (projectile.type === 'frost') {
-            projectile.mesh.lookAt(
-                projectile.position.x + dx,
-                projectile.position.y + dy,
-                projectile.position.z + dz
-            );
-        }
     });
     
-    // Remove projectiles
+    // Remove projectiles that have reached their target
     projectilesToRemove.forEach(projectile => {
+        scene.remove(projectile.mesh);
         const index = gameState.projectiles.indexOf(projectile);
-        if (index !== -1) {
-            scene.remove(projectile.mesh);
+        if (index > -1) {
             gameState.projectiles.splice(index, 1);
         }
     });
-    
-    // Update any active animations
-    if (gameState.activeAnimations) {
-        for (let i = gameState.activeAnimations.length - 1; i >= 0; i--) {
-            const animationFunc = gameState.activeAnimations[i];
-            const continueAnimation = animationFunc(delta);
-            
-            if (!continueAnimation) {
-                gameState.activeAnimations.splice(i, 1);
-            }
-        }
-    }
 }
 
 
 // Find target for tower
 function findTarget(tower) {
+    // Safety check for tower position
+    if (!tower || !tower.position) {
+        console.warn("Invalid tower in findTarget:", tower);
+        return null;
+    }
+    
     // Sort creeps by progress (prioritize creeps further along the path)
     const sortedCreeps = [...gameState.creeps]
-        .filter(creep => !creep.reachedKing && creep.health > 0)
+        .filter(creep => {
+            // Safety check for creep mesh and position
+            if (!creep || !creep.mesh || !creep.mesh.position) {
+                console.warn("Invalid creep in filter:", creep);
+                return false;
+            }
+            return !creep.reachedKing && creep.health > 0;
+        })
         .sort((a, b) => b.progress - a.progress);
     
     // For basic towers, find up to 2 targets
@@ -2353,31 +2271,44 @@ function findTarget(tower) {
         const targets = [];
         for (let i = 0; i < sortedCreeps.length && targets.length < 2; i++) {
             const creep = sortedCreeps[i];
-            const distance = getDistance3D(tower.position, creep.position);
+            const distance = getDistance3D(tower.position, creep.mesh.position);
             
             if (distance <= tower.range) {
                 targets.push(creep);
             }
         }
-        console.log("Basic tower found targets:", targets.length); // Debug log
-        return targets;
+        console.log("Basic tower found targets:", targets.length);
+        return targets; // Return array of targets for basic towers
     }
     
     // For other towers, find single target
     for (let i = 0; i < sortedCreeps.length; i++) {
         const creep = sortedCreeps[i];
-        const distance = getDistance3D(tower.position, creep.position);
+        const distance = getDistance3D(tower.position, creep.mesh.position);
         
         if (distance <= tower.range) {
-            return [creep]; // Return as array for consistency
+            return creep;
         }
     }
     
-    return [];
+    return null;
 }
 
 // Calculate 3D distance between two points
 function getDistance3D(point1, point2) {
+    // Safety check for undefined or null points
+    if (!point1 || !point2) {
+        console.warn("Invalid points in getDistance3D:", point1, point2);
+        return Infinity; // Return a large distance to prevent targeting
+    }
+    
+    // Safety check for missing coordinates
+    if (typeof point1.x !== 'number' || typeof point1.y !== 'number' || typeof point1.z !== 'number' ||
+        typeof point2.x !== 'number' || typeof point2.y !== 'number' || typeof point2.z !== 'number') {
+        console.warn("Invalid coordinates in getDistance3D:", point1, point2);
+        return Infinity; // Return a large distance to prevent targeting
+    }
+    
     const dx = point1.x - point2.x;
     const dy = point1.y - point2.y;
     const dz = point1.z - point2.z;
@@ -2385,136 +2316,108 @@ function getDistance3D(point1, point2) {
 }
 
 function startRound() {
-    // Don't start if game is over
-    if (!gameState.gameActive) return;
+    console.log("Starting round", gameState.currentRound + 1);
     
-    // Don't start if there are still creeps from previous round
-    if (gameState.creeps.length > 0) {
-        console.log("Cannot start new round - creeps still active");
-        // Try again after a delay
-        setTimeout(startRound, 1000);
-        return;
-    }
+    // Reset round-specific augments
+    resetRoundAugments();
     
+    // Get current round definition before incrementing
+    const currentRoundDef = gameState.roundDefinitions[gameState.currentRound];
+    
+    // Increment round counter
     gameState.currentRound++;
+    
+    // Check for game over
     if (gameState.currentRound > gameState.maxRounds) {
-        gameState.gameActive = false;
         showGameOverScreen(true);
         return;
     }
     
-    // Update UI
-    updateRoundCounter();
-    updateRoundTracker();
-    
-    // Reset and hide round timer during active round
-    document.getElementById('round-timer').textContent = 'Round in progress';
-    
-    // Calculate creep stats for this round
-    const baseCreepCount = 8;
-    const creepCountIncrease = 1.1; // 10% increase per round
-    
-    const creepCount = Math.floor(baseCreepCount * Math.pow(creepCountIncrease, gameState.currentRound - 1));
-    
-    // Spawn creeps
-    gameState.roundActive = true;
-    
-    // Determine distribution of creeps across paths
-    // This will vary based on round type
-    let pathDistribution;
-    const roundDef = gameState.roundDefinitions[gameState.currentRound - 1];
-    
-    switch(roundDef.type) {
-        case 'swarm':
-            // Swarm creeps come mainly from one random path
-            const mainPath = Math.floor(Math.random() * 3);
-            pathDistribution = [0.1, 0.1, 0.1];
-            pathDistribution[mainPath] = 0.8;
-            break;
-        case 'armored':
-            // Armored creeps are evenly distributed but fewer in number
-            pathDistribution = [0.33, 0.34, 0.33];
-            break;
-        case 'fast':
-            // Fast creeps come from all paths but slightly more from sides
-            pathDistribution = [0.4, 0.2, 0.4];
-            break;
-        default:
-            // Default even distribution
-            pathDistribution = [0.33, 0.34, 0.33];
-    }
-    
-    // Calculate creeps per path
-    const creepsPerPath = [
-        Math.floor(creepCount * pathDistribution[0]),
-        Math.floor(creepCount * pathDistribution[1]),
-        Math.floor(creepCount * pathDistribution[2])
-    ];
-    
-    // Add any remainder to the first path
-    const totalAllocated = creepsPerPath.reduce((sum, current) => sum + current, 0);
-    creepsPerPath[0] += creepCount - totalAllocated;
-    
-    // Spawn creeps with a delay for each path
-    for (let pathIdx = 0; pathIdx < gameState.paths.length; pathIdx++) {
-        for (let i = 0; i < creepsPerPath[pathIdx]; i++) {
-            setTimeout(() => {
-                // Set the spawn point for this creep
-                const specificPathIndex = pathIdx;
-                spawnCreepOnPath(specificPathIndex);
-            }, (pathIdx * 300) + (i * 800)); // Stagger spawn timing between paths
-        }
-    }
-}
-
-
-
-// End round function
-function endRound() {
-    // Don't end round if there are still creeps
-    if (gameState.creeps.length > 0) {
-        console.log("Cannot end round - creeps still active");
-        // Try again after a delay
-        setTimeout(endRound, 1000);
-        return;
-    }
-    
-    gameState.roundActive = false;
-    startInterRoundTimer();
-    
-    // Bonus gold at end of round
-    gameState.gold += 3;
-    updateGold();
-    
     // Update round tracker
     updateRoundTracker();
-}
-
-// Start timer between rounds
-function startInterRoundTimer() {
-    // Check if there are still creeps from the previous round
-    if (gameState.creeps.length > 0) {
-        console.log("Cannot start timer - creeps still active");
-        // Try again after a delay
-        setTimeout(startInterRoundTimer, 1000);
-        return;
-    }
+    
+    // Calculate number of creeps to spawn
+    const baseCreeps = 5;
+    const roundBonus = Math.min(gameState.currentRound, 10);
+    gameState.creepsToSpawn = baseCreeps + roundBonus;
+    console.log("Creeps to spawn:", gameState.creepsToSpawn);
+    
+    // Set round as active
+    gameState.roundActive = true;
+    gameState.isPaused = false;
     
     // Clear any existing timer
     if (gameState.timerInterval) {
         clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
     }
     
+    // Spawn creeps with delay
+    let spawnCount = 0;
+    const spawnInterval = setInterval(() => {
+        if (spawnCount < gameState.creepsToSpawn) {
+            // Randomly select a path for this creep
+            const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+            spawnCreepOnPath(pathIndex);
+            spawnCount++;
+            console.log("Spawned creep", spawnCount, "of", gameState.creepsToSpawn);
+        } else {
+            clearInterval(spawnInterval);
+            console.log("Finished spawning all creeps");
+        }
+    }, 1000); // 1 second delay between spawns
+    
+    // Start round timer
+    gameState.roundTimer = 0;
+    updateRoundTimer();
+}
+
+// End round function
+function endRound() {
+    console.log("Ending round", gameState.currentRound);
+    
+    // Clear any existing timer
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
+    }
+    
+    // Reset round-specific augments
+    resetRoundAugments();
+    
+    // Set round as inactive
+    gameState.roundActive = false;
+    
+    // Start inter-round timer
+    startInterRoundTimer();
+}
+
+// Start timer between rounds
+function startInterRoundTimer() {
+    console.log("Starting inter-round timer");
+    
+    // Clear any existing timer
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
+    }
+    
+    // Set initial timer value
     gameState.interRoundTimer = 10;
     updateRoundTimer();
     
+    // Start the countdown
     gameState.timerInterval = setInterval(() => {
+        if (!gameState.isPaused) {
         gameState.interRoundTimer--;
         updateRoundTimer();
         
         if (gameState.interRoundTimer <= 0) {
             clearInterval(gameState.timerInterval);
+                gameState.timerInterval = null;
+                console.log("Inter-round timer finished, starting next round");
             startRound();
+            }
         }
     }, 1000);
 }
@@ -2552,7 +2455,14 @@ function selectTower(tower) {
     
     document.getElementById('tower-details-icon').style.backgroundColor = '#' + tower.mesh.material.color.getHexString();
     document.getElementById('tower-details-name').textContent = `${towerType.name}`;
-    document.getElementById('tower-details-damage').textContent = `Damage: ${tower.damage}`;
+    
+    // Show damage per target for basic towers
+    if (tower.type === 'basic') {
+        document.getElementById('tower-details-damage').textContent = `Damage: ${tower.damage} (${Math.floor(tower.damage * 0.5)} per target)`;
+    } else {
+        document.getElementById('tower-details-damage').textContent = `Damage: ${tower.damage}`;
+    }
+    
     document.getElementById('tower-details-speed').textContent = `Attack Speed: ${tower.attackSpeed}s`;
     document.getElementById('tower-details-rank').textContent = `Rank: ${tower.rank}`;
     
@@ -2933,6 +2843,8 @@ function handleCanvasClick(event) {
 
 // Also modify the selectTowerSlot function to call setupTowerSelectionListeners
 function selectTowerSlot(slot) {
+    console.log("Selecting tower slot:", slot);
+    
     // If there was a previously selected tower, remove its range indicator
     if (gameState.selectedTower && gameState.selectedTower.rangeIndicator) {
         scene.remove(gameState.selectedTower.rangeIndicator);
@@ -3028,34 +2940,34 @@ if (!gameState.paths) {
     gameState.paths = [
         // Left path
         { 
-            spawnPoint: { x: -15, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(-15, 0, -25),
             waypoints: [
-                { x: -15, y: 0, z: -25 },
-                { x: -15, y: 0, z: -10 },
-                { x: -15, y: 0, z: 0 },
-                { x: -10, y: 0, z: 5 },
-                { x: -5, y: 0, z: 7 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(-15, 0, -25),
+                new THREE.Vector3(-15, 0, -10),
+                new THREE.Vector3(-15, 0, 0),
+                new THREE.Vector3(-10, 0, 5),
+                new THREE.Vector3(-5, 0, 7),
+                new THREE.Vector3(0, 0, 10)
             ]
         },
         // Center path
         {
-            spawnPoint: { x: 0, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(0, 0, -25),
             waypoints: [
-                { x: 0, y: 0, z: -25 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(0, 0, -25),
+                new THREE.Vector3(0, 0, 10)
             ]
         },
         // Right path
         {
-            spawnPoint: { x: 15, y: 0, z: -25 },
+            spawnPoint: new THREE.Vector3(15, 0, -25),
             waypoints: [
-                { x: 15, y: 0, z: -25 },
-                { x: 15, y: 0, z: -10 },
-                { x: 15, y: 0, z: 0 },
-                { x: 10, y: 0, z: 5 },
-                { x: 5, y: 0, z: 7 },
-                { x: 0, y: 0, z: 10 }
+                new THREE.Vector3(15, 0, -25),
+                new THREE.Vector3(15, 0, -10),
+                new THREE.Vector3(15, 0, 0),
+                new THREE.Vector3(10, 0, 5),
+                new THREE.Vector3(5, 0, 7),
+                new THREE.Vector3(0, 0, 10)
             ]
         }
     ];
@@ -3161,185 +3073,224 @@ function updateCriticalHitParticles(delta) {
 
 // Create a fire critical hit explosion effect
 function createFireCriticalEffect(position) {
-    const impactGroup = new THREE.Group();
+    // Create a group to hold all particles
+    const particleGroup = new THREE.Group();
     
-    // Central flash
-    const flashGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-    const flashMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff4500,
-        transparent: true,
-        opacity: 0.7
-    });
-    
-    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-    impactGroup.add(flash);
-    
-    // Fire particles exploding outward
-    const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-    const particleMaterial = new THREE.MeshBasicMaterial({
-        color: 0xff8c00,
-        transparent: true,
-        opacity: 0.8
-    });
-    
-    const numParticles = 16;
-    const particles = [];
-    
-    for (let i = 0; i < numParticles; i++) {
-        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-        
-        // Calculate position on a sphere
-        const phi = Math.acos(-1 + (2 * i) / numParticles);
-        const theta = Math.sqrt(numParticles * Math.PI) * phi;
-        
-        particle.position.set(
-            0.2 * Math.cos(theta) * Math.sin(phi),
-            0.2 * Math.sin(theta) * Math.sin(phi),
-            0.2 * Math.cos(phi)
-        );
-        
-        // Store original position for animation
-        particle.userData = {
-            originalPos: particle.position.clone(),
-            direction: particle.position.clone().normalize(),
-            speed: Math.random() * 2 + 3,
-            rotationSpeed: Math.random() * 2 + 1
-        };
-        
-        impactGroup.add(particle);
-        particles.push(particle);
-    }
-    
-    // Create fire ring effect
-    const ringGeometry = new THREE.RingGeometry(0.2, 0.6, 32);
+    // Create the main explosion ring
+    const ringGeometry = new THREE.RingGeometry(0.2, 0.4, 32);
     const ringMaterial = new THREE.MeshBasicMaterial({
         color: 0xff4500,
         transparent: true,
-        opacity: 0.5,
+        opacity: 1,
         side: THREE.DoubleSide
     });
     
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.rotation.x = Math.PI / 2;
-    impactGroup.add(ring);
+    const explosionRing = new THREE.Mesh(ringGeometry, ringMaterial);
+    explosionRing.rotation.x = -Math.PI / 2;
+    explosionRing.position.set(position.x, 0.1, position.z);
+    particleGroup.add(explosionRing);
     
-    // Set position
-    impactGroup.position.copy(position);
+    // Add some particles
+    const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+    const particleMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 1
+    });
     
-    // Add to scene
-    scene.add(impactGroup);
-    
-    // Animate the effect
-    const lifeTime = 0.6; // Effect lasts for 0.6 seconds
-    let elapsed = 0;
-    
-    function animateImpact(delta) {
-        elapsed += delta;
-        
-        if (elapsed >= lifeTime) {
-            // Remove from scene when animation is complete
-            scene.remove(impactGroup);
-            return false; // Stop animation
-        }
-        
-        // Progress from 0 to 1
-        const progress = elapsed / lifeTime;
-        
-        // Animate central flash - expand and fade
-        flash.scale.set(1 + progress * 2, 1 + progress * 2, 1 + progress * 2);
-        flashMaterial.opacity = 0.7 * (1 - progress);
-        
-        // Animate particles - move outward, rotate, and fade
-        particles.forEach(particle => {
-            const dir = particle.userData.direction;
-            const speed = particle.userData.speed;
-            const originalPos = particle.userData.originalPos;
-            
-            // Move outward
-            particle.position.copy(originalPos).add(
-                dir.clone().multiplyScalar(progress * speed)
-            );
-            
-            // Rotate particle
-            particle.rotation.x += particle.userData.rotationSpeed * delta;
-            particle.rotation.y += particle.userData.rotationSpeed * delta;
-            
-            // Fade out
-            particle.material.opacity = 0.8 * (1 - progress);
-        });
-        
-        // Animate ring - expand and fade
-        ring.scale.set(1 + progress * 3, 1 + progress * 3, 1 + progress * 3);
-        ringMaterial.opacity = 0.5 * (1 - progress);
-        
-        return true; // Continue animation
+    for (let i = 0; i < 8; i++) {
+        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 0.2 + Math.random() * 0.3;
+        particle.position.set(
+            position.x + Math.cos(angle) * radius,
+            0.1 + Math.random() * 0.2,
+            position.z + Math.sin(angle) * radius
+        );
+        particleGroup.add(particle);
     }
     
-    // Return the animation function so it can be added to game loop
-    return animateImpact;
+    // Add to scene
+    scene.add(particleGroup);
+    
+    // Add animation data
+    particleGroup.userData = {
+        time: 0,
+        duration: 0.5
+    };
+    
+    // Add to active animations
+    if (!gameState.activeAnimations) {
+        gameState.activeAnimations = [];
+    }
+    
+    const animation = function(delta) {
+        particleGroup.userData.time += delta;
+        const progress = particleGroup.userData.time / particleGroup.userData.duration;
+        
+        if (progress >= 1) {
+            scene.remove(particleGroup);
+            return false;
+        }
+            
+            // Fade out
+        const opacity = 1 - progress;
+        particleGroup.children.forEach(child => {
+            if (child.material) {
+                child.material.opacity = opacity;
+            }
+        });
+        
+        // Expand ring
+        if (explosionRing) {
+            const scale = 1 + progress * 2;
+            explosionRing.scale.set(scale, scale, 1);
+        }
+        
+        return true;
+    };
+    
+    gameState.activeAnimations.push(animation);
 }
 
 // Create floating damage number
 function createFloatingDamageNumber(position, damage, isCritical = false) {
+    // Create a canvas element for the damage number
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 1024; // Reduced from 2048
-    canvas.height = 512; // Reduced from 1024
+    const ctx = canvas.getContext('2d');
+    canvas.width = 128;  // Increased size
+    canvas.height = 64;  // Increased size
+    
+    // Draw the damage number with larger font and better styling
+    ctx.fillStyle = isCritical ? '#ff0000' : '#ffffff';
+    ctx.font = 'bold 48px Arial';  // Increased font size
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Add text shadow for better visibility
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    
+    ctx.fillText(damage.toString(), 64, 32);
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.MeshBasicMaterial({
+    const spriteMaterial = new THREE.SpriteMaterial({ 
         map: texture,
         transparent: true,
-        depthTest: false,
-        depthWrite: false
+        depthTest: false  // Ensure it's always visible
     });
+    const sprite = new THREE.Sprite(spriteMaterial);
     
-    // Create sprite
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(8, 4, 8); // Reduced from 16, 8, 16
-    sprite.position.copy(position);
-    sprite.position.y += 1.5; // Position above creep
-    
-    // Draw text on canvas
-    context.font = isCritical ? 'bold 256px Arial' : '192px Arial'; // Reduced from 512px/384px
-    context.fillStyle = '#FFFFFF'; // Pure white
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillText(damage.toString(), canvas.width/2, canvas.height/2);
+    // Set initial position and scale
+    sprite.position.set(position.x, position.y + 1, position.z);
+    sprite.scale.set(2, 1, 1);  // Increased scale
     
     // Add to scene
     scene.add(sprite);
     
-    // Animate the floating number
-    const duration = 1.0; // Duration in seconds
-    const startY = sprite.position.y;
-    const endY = startY + 2; // Float up 2 units
-    let elapsed = 0;
-    
-    function animateDamageNumber(delta) {
-        elapsed += delta;
+    // Create animation
+    let time = 0;
+    const animation = function(delta) {
+        time += delta;
         
-        if (elapsed >= duration) {
-            scene.remove(sprite);
-            return false; // Stop animation
-        }
+        // Initial pop-up effect
+        const popUpProgress = Math.min(1, time * 5);  // Faster initial pop
+        const popUpScale = 1 + (1 - popUpProgress) * 0.5;  // Start larger and shrink to normal size
         
-        // Progress from 0 to 1
-        const progress = elapsed / duration;
-        
-        // Float upward
-        sprite.position.y = startY + (endY - startY) * progress;
+        // Float upward with easing
+        const floatProgress = Math.min(1, time * 2);  // Slower float
+        const floatHeight = floatProgress * 2;  // Float up 2 units
         
         // Fade out
-        sprite.material.opacity = 1 - progress;
+        const fadeProgress = Math.max(0, 1 - (time - 0.5));  // Start fading after 0.5s
         
-        return true; // Continue animation
-    }
+        // Apply transformations
+        sprite.scale.set(2 * popUpScale, popUpScale, 1);
+        sprite.position.y = position.y + 1 + floatHeight;
+        sprite.material.opacity = fadeProgress;
+        
+        // Remove when done
+        if (time >= 1) {
+            scene.remove(sprite);
+            return false;
+        }
+        
+        return true;
+    };
     
-    // Add to animation system
+    // Add to active animations
     if (!gameState.activeAnimations) {
         gameState.activeAnimations = [];
     }
+    gameState.activeAnimations.push(animation);
+}
+
+// Function to show augment selection modal
+function showAugmentSelection() {
     gameState.activeAnimations.push(animateDamageNumber);
+}
+
+// Function to show augment selection modal
+function showAugmentSelection() {
+    const modal = document.getElementById('augment-modal');
+    const options = modal.querySelectorAll('.augment-option');
+    
+    // Hide all options first
+    options.forEach(option => option.style.display = 'none');
+    
+    // Get 3 random augments that aren't already active
+    const availableAugments = gameState.availableAugments.filter(
+        augment => !gameState.activeAugments.includes(augment.id)
+    );
+    
+    // Randomly select 3 augments
+    const selectedAugments = [];
+    for (let i = 0; i < 3 && availableAugments.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * availableAugments.length);
+        selectedAugments.push(availableAugments.splice(randomIndex, 1)[0]);
+    }
+    
+    // Show only the selected augments
+    selectedAugments.forEach(augment => {
+        const option = modal.querySelector(`[data-augment="${augment.id}"]`);
+        if (option) {
+            option.style.display = 'flex';
+            option.onclick = () => selectAugment(augment);
+        }
+    });
+    
+    // Show the modal
+    modal.classList.remove('hidden');
+}
+
+// Function to handle augment selection
+function selectAugment(augment) {
+    // Add augment to active augments
+    gameState.activeAugments.push(augment.id);
+    
+    // Apply the augment effect
+    if (augment.id === 'golden-towers') {
+        augment.effect();
+    } else {
+        gameState.towers.forEach(tower => augment.effect(tower));
+    }
+    
+    // Hide the modal
+    document.getElementById('augment-modal').classList.add('hidden');
+    
+    // Start the round
+    startRound();
+}
+
+// Function to reset round-specific augments
+function resetRoundAugments() {
+    gameState.towers.forEach(tower => {
+        if (gameState.activeAugments.includes('towers-of-rage')) {
+            const augment = gameState.availableAugments.find(a => a.id === 'towers-of-rage');
+            augment.reset(tower);
+        }
+    });
 }
