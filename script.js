@@ -1425,11 +1425,11 @@ function spawnCreep() {
         // Randomly select a path for this creep
         const pathIndex = Math.floor(Math.random() * gameState.paths.length);
         const path = gameState.paths[pathIndex];
-        const spawnPoint = path.waypoints[0]; // Use first waypoint as spawn point
+        const spawnPoint = path.spawnPoint; // Use dedicated spawn point
         
         // Create 3D mesh with the appropriate type
         const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.set(spawnPoint.x, 0.5, spawnPoint.z); // Set initial position at first waypoint
+        creepMesh.position.set(spawnPoint.x, 0.5, spawnPoint.z); // Set initial position at spawn point
         scene.add(creepMesh);
         
         // Set type-specific properties
@@ -1538,11 +1538,11 @@ function spawnCreepOnPath(pathIndex) {
 
         // Create creep mesh with the correct type
         const creepMesh = createCreepMesh(creepType);
-        // Set initial position at first waypoint
+        // Set initial position at spawn point
         creepMesh.position.set(
-            path.waypoints[0].x,
+            path.spawnPoint.x,
             0.5, // Keep constant height
-            path.waypoints[0].z
+            path.spawnPoint.z
         );
         scene.add(creepMesh);
         
@@ -1583,9 +1583,9 @@ function spawnCreepOnPath(pathIndex) {
         const creep = {
             mesh: creepMesh,
             position: { 
-                x: path.waypoints[0].x,
+                x: path.spawnPoint.x,
                 y: 0.5,
-                z: path.waypoints[0].z
+                z: path.spawnPoint.z
             },
             progress: 0,
             health: health,
