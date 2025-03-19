@@ -279,7 +279,7 @@ let gameState = {
     workers: [],
     workerCost: 3,
     goldPerWorker: 1,
-    workerMiningInterval: 3, // seconds
+    workerMiningInterval: 5, // seconds
     workerMiningTimers: {}
 };
 
@@ -2808,6 +2808,7 @@ function updateKingHealth() {
 
 function updateGold() {
     document.getElementById('gold').textContent = gameState.gold;
+    updateBuyWorkerButton();
 }
 
 function updateTowerCount() {
@@ -3742,5 +3743,15 @@ function updateWorkerList() {
 
 function updateBuyWorkerButton() {
     const buyWorkerBtn = document.getElementById('buy-worker');
-    buyWorkerBtn.disabled = gameState.gold < gameState.workerCost;
+    
+    // Check if there are available rocks
+    const availableRocks = scene.children.filter(child => 
+        child.userData.type === 'mining-rock' &&
+        !gameState.workers.some(w => w.targetRock === child)
+    );
+    
+    // Disable button if either condition is true:
+    // 1. Not enough gold
+    // 2. No available mining spots
+    buyWorkerBtn.disabled = gameState.gold < gameState.workerCost || availableRocks.length === 0;
 }
