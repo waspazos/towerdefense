@@ -155,6 +155,9 @@ let gameState = {
     gold: 10,
     towerCount: 0,
     totalDamage: 0,
+    damageInCurrentSecond: 0,
+    currentDPS: 0,
+    lastDPSUpdateTime: 0,
     currentRound: 0,
     maxRounds: 20,
     gameActive: false,
@@ -223,7 +226,7 @@ let gameState = {
         frost: {
             name: "Frost Tower",
             ranks: [
-                { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
+                { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.5, color: 0x6495ED },
                 { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
             ]
         },
@@ -1421,6 +1424,9 @@ function animate() {
         updateProjectiles(safeDelta);
         updateCriticalHitParticles(safeDelta);
         
+        // Update UI
+        updateUI();
+        
         // Update animations
         if (gameState.activeAnimations) {
             for (let i = gameState.activeAnimations.length - 1; i >= 0; i--) {
@@ -1485,17 +1491,17 @@ function spawnCreep() {
         // Base values without any multipliers for round 1
         switch(creepType) {
             case 'fast':
-                health = 15;
+                health = 25;
                 damage = 2;
                 speed = 3.45;
                 break;
             case 'armored':
-                health = 35;
+                health = 45;
                 damage = 2;
                 speed = 1.725;
                 break;
             case 'swarm':
-                health = 10;
+                health = 20;
                 damage = 1;
                 speed = 2.53;
                 break;
@@ -1508,7 +1514,7 @@ function spawnCreep() {
         
         // Only apply difficulty scaling if we're past round 1
         if (gameState.currentRound > 1) {
-            const difficultyMultiplier = Math.pow(1.1, gameState.currentRound - 1);
+            const difficultyMultiplier = Math.pow(1.25, gameState.currentRound - 1);
             health = Math.round(health * difficultyMultiplier);
         }
         
@@ -1737,13 +1743,13 @@ function addSlowVisualEffect(creep) {
     // Create a group for particles
     const particleGroup = new THREE.Group();
     
-    // Add some particles around the creep
-    for (let i = 0; i < 8; i++) {
+    // Add more particles for better visibility
+    for (let i = 0; i < 12; i++) {
         const particle = new THREE.Mesh(particleGeometry, particleMaterial);
         
         // Random position around the creep
         const angle = Math.random() * Math.PI * 2;
-        const radius = 0.3 + Math.random() * 0.2;
+        const radius = 0.4 + Math.random() * 0.3;
         particle.position.set(
             Math.cos(angle) * radius,
             0.5 + Math.random() * 0.5,
@@ -1762,7 +1768,7 @@ function addSlowVisualEffect(creep) {
     }
     
     // Add ice crystals forming on the creep
-    const crystalGeometry = new THREE.ConeGeometry(0.03, 0.15, 4);
+    const crystalGeometry = new THREE.ConeGeometry(0.04, 0.2, 4);
     const crystalMaterial = new THREE.MeshStandardMaterial({
         color: 0xCCEEFF,
         transparent: true,
@@ -1771,14 +1777,14 @@ function addSlowVisualEffect(creep) {
         emissiveIntensity: 0.3
     });
     
-    // Add several small ice crystals on the creep's body
-    for (let i = 0; i < 5; i++) {
+    // Add more ice crystals for better coverage
+    for (let i = 0; i < 8; i++) {
         const crystal = new THREE.Mesh(crystalGeometry, crystalMaterial);
         
         // Position crystals on the body surface
         const angle = Math.random() * Math.PI * 2;
-        const height = Math.random() * 0.8 - 0.2;
-        const radius = 0.25;
+        const height = Math.random() * 1.0 - 0.3;
+        const radius = 0.3;
         
         crystal.position.set(
             Math.cos(angle) * radius,
@@ -1803,18 +1809,18 @@ function addSlowVisualEffect(creep) {
         particleGroup.add(crystal);
     }
     
-    // Add a frost aura effect
-    const auraGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
+    // Add a larger frost aura effect
+    const auraGeometry = new THREE.RingGeometry(0.5, 0.7, 32);
     const auraMaterial = new THREE.MeshBasicMaterial({
         color: 0xADD8E6,
         transparent: true,
-        opacity: 0.3,
+        opacity: 0.4,
         side: THREE.DoubleSide
     });
     
     const frostAura = new THREE.Mesh(auraGeometry, auraMaterial);
-    frostAura.rotation.x = Math.PI / 2; // Make it horizontal
-    frostAura.position.y = 0.05; // Just above the ground
+    frostAura.rotation.x = Math.PI / 2;
+    frostAura.position.y = 0.05;
     
     // Add animation data
     frostAura.userData = {
@@ -1822,6 +1828,32 @@ function addSlowVisualEffect(creep) {
     };
     
     particleGroup.add(frostAura);
+    
+    // Add a blue tint to the creep's material
+    if (creep.mesh) {
+        // Store original materials and create new ones for the slow effect
+        creep.mesh.traverse((object) => {
+            if (object.isMesh && object.material) {
+                // Store original material
+                object.userData.originalMaterial = object.material;
+                
+                // Create a new material for the slow effect
+                const newMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x87CEEB,
+                    transparent: true,
+                    opacity: 0.8,
+                    emissive: 0x87CEEB,
+                    emissiveIntensity: 0.2,
+                    metalness: object.material.metalness || 0,
+                    roughness: object.material.roughness || 0.5,
+                    side: object.material.side || THREE.FrontSide
+                });
+                
+                // Apply the new material
+                object.material = newMaterial;
+            }
+        });
+    }
     
     creep.mesh.add(particleGroup);
     creep.slowEffectVisual = particleGroup;
@@ -1844,23 +1876,21 @@ function addSlowVisualEffect(creep) {
                         particle.position.z = Math.sin(particle.userData.angle) * particle.userData.radius;
                         particle.position.y = particle.userData.originalY + Math.sin(particle.userData.angle * 2) * 0.1;
                     }
-                } else if (particle.geometry.type === 'ConeGeometry') {
-                    // Animate ice crystal growth
-                    if (particle.userData) {
-                        if (particle.userData.growthStage < 1) {
-                            particle.userData.growthStage += delta * particle.userData.growthRate;
-                            const currentSize = Math.min(1, particle.userData.growthStage) * particle.userData.maxSize;
-                            particle.scale.set(currentSize, currentSize, currentSize);
-                        }
+                }
+                // Animate ice crystal growth
+                if (particle.userData && particle.userData.growthStage !== undefined) {
+                    if (particle.userData.growthStage < 1) {
+                        particle.userData.growthStage += delta * particle.userData.growthRate;
+                        const currentSize = Math.min(1, particle.userData.growthStage) * particle.userData.maxSize;
+                        particle.scale.set(currentSize, currentSize, currentSize);
                     }
-                } else if (particle.geometry.type === 'RingGeometry') {
-                    // Pulse the aura
+                }
+                // Animate aura
+                if (particle.geometry.type === 'RingGeometry') {
                     if (particle.userData) {
                         particle.userData.pulseTime += delta * 2;
                         const pulseSize = 1 + Math.sin(particle.userData.pulseTime) * 0.2;
                         particle.scale.set(pulseSize, pulseSize, 1);
-                        
-                        // Also make it rotate slowly
                         particle.rotation.z += delta * 0.5;
                     }
                 }
@@ -1871,6 +1901,13 @@ function addSlowVisualEffect(creep) {
                 // Remove the visual effect if no longer slowed
                 this.mesh.remove(this.slowEffectVisual);
                 this.slowEffectVisual = null;
+                
+                // Restore original materials
+                this.mesh.traverse((object) => {
+                    if (object.isMesh && object.userData.originalMaterial) {
+                        object.material = object.userData.originalMaterial;
+                    }
+                });
             }
         }
     };
@@ -2417,6 +2454,9 @@ function updateProjectiles(delta) {
             const damage = Math.round(projectile.damage);
             projectile.target.health -= damage;
             
+            // Track damage for DPS calculation
+            gameState.damageInCurrentSecond += damage;
+            
             // Update health bar
             if (projectile.target.healthBar) {
                 const healthPercent = Math.max(0, projectile.target.health / projectile.target.maxHealth);
@@ -2429,6 +2469,15 @@ function updateProjectiles(delta) {
             
             // Create floating damage number
             createFloatingDamageNumber(projectile.position, damage, projectile.isCritical);
+            
+            // Apply slow effect for frost tower projectiles
+            if (projectile.type === 'frost') {
+                const tower = gameState.towers.find(t => t.type === 'frost');
+                if (tower) {
+                    const slowAmount = gameState.towerTypes.frost.ranks[tower.rank - 1].slowEffect;
+                    applySlowEffect(projectile.target, slowAmount, tower.rank);
+                }
+            }
             
             // Remove creep if dead
             if (projectile.target.health <= 0) {
@@ -2616,6 +2665,9 @@ function startRound() {
     // Update round tracker and counter
     updateRoundTracker();
     updateRoundCounter();
+    gameState.damageInCurrentSecond = 0;
+    gameState.currentDPS = 0;
+    gameState.lastDPSUpdateTime = performance.now() / 1000;
 }
 
 function endRound() {
@@ -2896,7 +2948,16 @@ function updateTowerCount() {
 }
 
 function updateTotalDamage() {
-    document.getElementById('total-damage').textContent = Math.floor(gameState.totalDamage);
+    const currentTime = performance.now() / 1000; // Convert to seconds
+    
+    // Update DPS every second
+    if (currentTime - gameState.lastDPSUpdateTime >= 1.0) {
+        gameState.currentDPS = gameState.damageInCurrentSecond;
+        gameState.damageInCurrentSecond = 0;
+        gameState.lastDPSUpdateTime = currentTime;
+    }
+    
+    document.getElementById('total-damage').textContent = Math.round(gameState.currentDPS);
 }
 
 function updateRoundCounter() {
@@ -3218,7 +3279,7 @@ function applySlowEffect(creep, slowAmount, towerRank) {
     // Add slow effect to creep's effects array
     creep.slowEffects.push({
         amount: slowAmount,
-        remainingTime: 2.0, // Slow effect lasts for 2 seconds
+        remainingTime: 5.0, // Slow effect lasts for 5 seconds
         source: towerRank // Track which tower rank applied the slow
     });
     
