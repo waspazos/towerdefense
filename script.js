@@ -2517,7 +2517,7 @@ function updateTotalDamage() {
 }
 
 function updateRoundCounter() {
-    document.getElementById('round-counter').textContent = `${gameState.currentRound}/${gameState.maxRounds}`;
+    document.getElementById('round-counter').textContent = `Round: ${gameState.currentRound}/${gameState.maxRounds}`;
 }
 
 // Show game over screen
