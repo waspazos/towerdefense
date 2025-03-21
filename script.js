@@ -412,7 +412,7 @@ function initGame() {
 }
 
 // Create creep mesh without using CapsuleGeometry
-function createCreepMesh(creepType = 'standard') {
+function createCreepMesh(creepType) {
     try {
         // Create group to hold all monster parts
         const monsterGroup = new THREE.Group();
@@ -439,12 +439,6 @@ function createCreepMesh(creepType = 'standard') {
             case 'boss':
                 bodyColor = 0x8B0000; // Dark red for boss
                 eyeColor = 0xFF0000;
-                hornColor = 0x4A0404;
-                break;
-            case 'standard':
-            default:
-                bodyColor = 0x8B0000; // Original dark red for standard creeps
-                eyeColor = 0xFFFF00;
                 hornColor = 0x4A0404;
                 break;
         }
@@ -1483,116 +1477,6 @@ function createRangeIndicator(position, range) {
     return rangeIndicator;
 }
 
-// Spawn a new creep (modified for sunken path)
-function spawnCreep() {
-    try {
-        // Get the current round definition
-        const roundIndex = gameState.currentRound - 1;
-        const roundDef = gameState.roundDefinitions[roundIndex];
-        
-        // Use the type directly from the round definition
-        let creepType = roundDef.type;
-        
-        // Randomly select a path for this creep
-        const pathIndex = Math.floor(Math.random() * gameState.paths.length);
-        const path = gameState.paths[pathIndex];
-        const spawnPoint = path.spawnPoint; // Use dedicated spawn point
-        
-        // Create 3D mesh with the appropriate type
-        const creepMesh = createCreepMesh(creepType);
-        creepMesh.position.set(spawnPoint.x, 0.5, spawnPoint.z); // Set initial position at spawn point
-        scene.add(creepMesh);
-        
-        // Set type-specific properties
-        let health, damage, speed;
-        
-        // Base values without any multipliers for round 1
-        switch(creepType) {
-            case 'fast':
-                health = 25;
-                damage = 2;
-                speed = 3.45;
-                break;
-            case 'armored':
-                health = 45;
-                damage = 2;
-                speed = 1.725;
-                break;
-            case 'swarm':
-                health = 20;
-                damage = 1;
-                speed = 2.53;
-                break;
-            default:
-                health = 25;
-                damage = 2;
-                speed = 2.3;
-                break;
-        }
-        
-        // Only apply difficulty scaling if we're past round 1
-        if (gameState.currentRound > 1) {
-            const difficultyMultiplier = Math.pow(1.5, gameState.currentRound - 1);
-            health = Math.round(health * difficultyMultiplier);
-        }
-        
-        // Add to game state with all required properties
-        const creep = {
-            mesh: creepMesh,
-            position: { x: spawnPoint.x, y: 0.5, z: spawnPoint.z },
-            progress: 0,
-            health: health,
-            maxHealth: health,
-            baseSpeed: speed,
-            speed: speed,
-            slowEffects: [],
-            effects: {
-                slow: [],
-                burn: null
-            },
-            reachedKing: false,
-            damageToKing: damage,
-            creepType: creepType,
-            pathIndex: pathIndex,
-            path: path,
-            currentWaypoint: 0
-        };
-        
-        // Create health bar and attach it to the monster
-        const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
-        const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        creep.healthBar.position.set(0, 1.2, 0);
-        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
-        creepMesh.add(creep.healthBar);
-        
-        // Add billboard behavior to make health bar always face camera
-        creep.healthBar.update = function() {
-            // Get the creep's position
-            const creepPosition = creep.mesh.position;
-            
-            // Get the camera's position
-            const cameraPosition = camera.position;
-            
-            // Calculate direction from creep to camera
-            const direction = new THREE.Vector3();
-            direction.subVectors(cameraPosition, creepPosition).normalize();
-            
-            // Make the health bar face the camera
-            this.lookAt(cameraPosition);
-            
-            // Keep the health bar horizontal by resetting X and Z rotation
-            this.rotation.x = 0;
-            this.rotation.z = 0;
-        };
-        
-        gameState.creeps.push(creep);
-        console.log("Creep spawned successfully:", creep);
-    } catch (error) {
-        console.error("Error spawning creep:", error);
-    }
-}
-
 // Function to spawn a creep on a specific path
 function spawnCreepOnPath(pathIndex) {
     try {
@@ -1627,67 +1511,63 @@ function spawnCreepOnPath(pathIndex) {
         // Base values without any multipliers for round 1
         switch(creepType) {
             case 'fast':
-                health = 25;
+                health = 40;
                 damage = 2;
                 speed = 3.45;
                 break;
             case 'armored':
-                health = 40;
+                health = 75;
                 damage = 2;
                 speed = 1.725;
                 break;
             case 'swarm':
-                health = 15;
+                health = 30;
                 damage = 1;
                 speed = 2.53;
                 break;
             case 'boss':
-                health = 550; // Boss has 200 HP
+                health = 750; // Boss has 750 HP
                 damage = 5; // Boss deals more damage
                 speed = 1.5; // Boss moves slower
-                break;
-            default:
-                health = 25;
-                damage = 2;
-                speed = 2.3;
                 break;
         }
         
         // Only apply difficulty scaling if we're past round 1
         if (gameState.currentRound > 1) {
-            const difficultyMultiplier = Math.pow(1.1, gameState.currentRound - 1);
+            const difficultyMultiplier = Math.pow(1.5, gameState.currentRound - 1);
             health = Math.round(health * difficultyMultiplier);
         }
         
-        // Create creep object
+        // Create creep object with all required properties
         const creep = {
             mesh: creepMesh,
-            path: path,
-            currentWaypoint: 0,
+            position: new THREE.Vector3(path.spawnPoint.x, 0.5, path.spawnPoint.z),
+            progress: 0,
             health: health,
             maxHealth: health,
-            damageToKing: damage,
             baseSpeed: speed,
             speed: speed,
-            type: creepType,
+            slowEffects: [],
             effects: {
                 slow: [],
                 burn: null
             },
-            slowEffects: [],
             reachedKing: false,
-            position: new THREE.Vector3(path.spawnPoint.x, 0.5, path.spawnPoint.z)
+            damageToKing: damage,
+            creepType: creepType,
+            pathIndex: pathIndex,
+            path: path,
+            currentWaypoint: 0
         };
         
-        // Add health bar
+        // Create health bar and attach it to the monster
         const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
         const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+        creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
         // Position health bar higher for boss creeps
-        healthBar.position.set(0, creepType === 'boss' ? 2.4 : 1.2, 0);
-        healthBar.renderOrder = 1; // Ensure health bar renders on top
-        creepMesh.add(healthBar);
-        creep.healthBar = healthBar;
+        creep.healthBar.position.set(0, creepType === 'boss' ? 2.4 : 1.2, 0);
+        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
+        creepMesh.add(creep.healthBar);
 
         // Add billboard behavior to make health bar always face camera
         creep.healthBar.update = function() {
