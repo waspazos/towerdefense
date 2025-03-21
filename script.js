@@ -27,136 +27,31 @@ window.handleTowerOptionClick = function(event, towerType) {
 };
 
 // Create a corrected version of the buildTower function
-window.buildTower = function(towerType) {
+function buildTower(towerType) {
     console.log("Global buildTower called with type:", towerType);
     
     // Make sure we have gameState.towerTypes defined
     if (!gameState.towerTypes) {
-        console.log("Tower types not defined, creating them now");
-        gameState.towerTypes = {
-            basic: {
-                name: "Basic Tower",
-                ranks: [
-                    { cost: 3, damage: 25, attackSpeed: 2, color: 0xaaaaaa },
-                    { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd },
-                    { cost: 8, damage: 60, attackSpeed: 1.2, color: 0xffffff },
-                    { cost: 12, damage: 85, attackSpeed: 1.0, color: 0xffffff },
-                    { cost: 15, damage: 120, attackSpeed: 0.8, color: 0xffffff }
-                ]
-            },
-            frost: {
-                name: "Frost Tower",
-                ranks: [
-                    { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
-                    { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.4, color: 0x1E90FF },
-                    { cost: 12, damage: 40, attackSpeed: 1.0, slowEffect: 0.5, color: 0x0000CD },
-                    { cost: 15, damage: 60, attackSpeed: 0.8, slowEffect: 0.6, color: 0x0000CD },
-                    { cost: 20, damage: 85, attackSpeed: 0.6, slowEffect: 0.7, color: 0x0000CD }
-                ]
-            },
-            fire: {
-                name: "Fire Tower",
-                ranks: [
-                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.4, critMultiplier: 1.5, color: 0xff4500 },
-                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.45, critMultiplier: 1.6, color: 0xff0000 },
-                    { cost: 15, damage: 55, attackSpeed: 1.2, critChance: 0.5, critMultiplier: 1.7, color: 0xff0000 },
-                    { cost: 20, damage: 80, attackSpeed: 1.0, critChance: 0.55, critMultiplier: 1.8, color: 0xff0000 },
-                    { cost: 25, damage: 110, attackSpeed: 0.8, critChance: 0.6, critMultiplier: 2.0, color: 0xff0000 }
-                ]
-            }
-        };
+        console.log("Tower types not defined, initializing from config");
+        gameState.towerTypes = window.towerConfig;
     }
     
-    // Check if slot is selected
-    if (!gameState.selectedTowerSlot) {
-        console.log("No tower slot selected");
-        return;
-    }
-    
-    // Get tower data
-    console.log("Tower types:", gameState.towerTypes);
-    console.log("Looking for tower type:", towerType);
-    
-    const towerData = gameState.towerTypes[towerType];
+    // Get tower data from config
+    const towerData = window.towerConfig[towerType];
     if (!towerData) {
-        console.error("Invalid tower type:", towerType);
+        console.error("Tower type not found:", towerType);
         return;
     }
     
-    const towerRank = towerData.ranks[0];
-    
-    // Check if we have enough gold
-    if (gameState.gold < towerRank.cost) {
-        console.log("Not enough gold");
+    const towerCost = towerData.ranks[0].cost;
+    if (gameState.gold < towerCost) {
+        console.log("Not enough gold to build tower");
         return;
     }
     
-    // Get slot
-    const slot = gameState.selectedTowerSlot;
-    console.log("Building tower at slot:", slot);
-    
-    try {
-        // Create tower mesh
-        const towerMesh = createTowerMesh(towerType, 1);
-        towerMesh.position.set(slot.x, slot.y + 1, slot.z);
-        scene.add(towerMesh);
-        
-        // Create tower object
-        const tower = {
-            mesh: towerMesh,
-            type: towerType,
-            rank: 1,
-            damage: towerRank.damage,
-            attackSpeed: towerRank.attackSpeed,
-            attackCooldown: 0,
-            range: 8,
-            position: { x: slot.x, y: slot.y + 1, z: slot.z },
-            slotIndex: slot.index,
-            totalCost: towerRank.cost,
-            targetCreep: null
-        };
-        
-        // Add special properties for specific tower types
-        if (towerType === 'frost') {
-            tower.slowEffect = towerRank.slowEffect;
-        } else if (towerType === 'fire') {
-            tower.critChance = towerRank.critChance;
-            tower.critMultiplier = towerRank.critMultiplier;
-        }
-        
-        // Apply catapult augment if active
-        if (gameState.activeAugments.includes('catapult')) {
-            const catapultAugment = gameState.availableAugments.find(a => a.id === 'catapult');
-            catapultAugment.effect(tower);
-        }
-        
-        // Add tower to game
-        gameState.towers.push(tower);
-        
-        // Mark slot as occupied
-        slot.occupied = true;
-        slot.tower = tower;
-        
-        // Deduct gold
-        gameState.gold -= towerRank.cost;
-        
-        // Update stats
-        gameState.towerCount++;
-        gameState.towersBuilt++;
-        
-        // Update UI
-        updateGold();
-        updateTowerCount();
-        
-        // Hide tower selection
-        document.getElementById('tower-selection').classList.add('hidden');
-        gameState.selectedTowerSlot = null;
-        
-        console.log("Tower built successfully:", tower);
-    } catch (error) {
-        console.error("Error building tower:", error);
-    }
-};
+    // Build the tower
+    buildTower(towerType);
+}
 
 // Game state
 let gameState = {
@@ -168,10 +63,10 @@ let gameState = {
     currentDPS: 0,
     lastDPSUpdateTime: 0,
     currentRound: 0,
-    maxRounds: 20,
+    maxRounds: window.roundConfig.maxRounds,
     gameActive: false,
     roundActive: false,
-    interRoundTimer: 10,
+    interRoundTimer: window.roundConfig.interRoundTimer,
     timerInterval: null,
     isPaused: false,
     creeps: [],
@@ -180,138 +75,28 @@ let gameState = {
     towerSlots: [],
     
     // New properties for round tracker
-    creepTypes: {
-        fast: { 
-            name: "Fast", 
-            description: "Quick enemy units with less health" 
-        },
-        armored: { 
-            name: "Armored", 
-            description: "Heavily armored, resistant to damage" 
-        },
-        swarm: { 
-            name: "Swarm", 
-            description: "Large numbers of weak enemies" 
-        },
-        boss: {
-            name: "Boss",
-            description: "A powerful enemy that appears every 5 rounds"
-        }
-    },
+    creepTypes: window.creepConfig.types,
     
     // Round definitions
-    roundDefinitions: [
-        { type: "fast", difficultly: 1 },
-        { type: "armored", difficultly: 1 },
-        { type: "swarm", difficultly: 1 },
-        { type: "fast", difficultly: 2 },
-        { type: "boss", difficultly: 1 },
-        { type: "armored", difficultly: 2 },
-        { type: "swarm", difficultly: 2 },
-        { type: "fast", difficultly: 3 },
-        { type: "armored", difficultly: 3 },
-        { type: "boss", difficultly: 2 },
-        { type: "swarm", difficultly: 3 },
-        { type: "fast", difficultly: 4 },
-        { type: "armored", difficultly: 4 },
-        { type: "swarm", difficultly: 4 },
-        { type: "boss", difficultly: 3 },
-        { type: "fast", difficultly: 5 },
-        { type: "armored", difficultly: 5 },
-        { type: "swarm", difficultly: 5 },
-        { type: "fast", difficultly: 6 },
-        { type: "boss", difficultly: 4 }
-    ],
+    roundDefinitions: window.roundConfig.rounds,
     
     // Define tower types
-    towerTypes: {
-        basic: {
-            name: "Basic Tower",
-            ranks: [
-                { cost: 3, damage: 25, attackSpeed: 2, color: 0xaaaaaa },
-                { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd },
-                { cost: 8, damage: 60, attackSpeed: 1.2, color: 0xffffff },
-                { cost: 12, damage: 85, attackSpeed: 1.0, color: 0xffffff },
-                { cost: 15, damage: 120, attackSpeed: 0.8, color: 0xffffff }
-            ]
-        },
-        frost: {
-            name: "Frost Tower",
-            ranks: [
-                { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
-                { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.4, color: 0x1E90FF },
-                { cost: 12, damage: 40, attackSpeed: 1.0, slowEffect: 0.5, color: 0x0000CD },
-                { cost: 15, damage: 60, attackSpeed: 0.8, slowEffect: 0.6, color: 0x0000CD },
-                { cost: 20, damage: 85, attackSpeed: 0.6, slowEffect: 0.7, color: 0x0000CD }
-            ]
-        },
-        fire: {
-            name: "Fire Tower",
-            ranks: [
-                { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.4, critMultiplier: 1.5, color: 0xff4500 },
-                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.45, critMultiplier: 1.6, color: 0xff0000 },
-                { cost: 15, damage: 55, attackSpeed: 1.2, critChance: 0.5, critMultiplier: 1.7, color: 0xff0000 },
-                { cost: 20, damage: 80, attackSpeed: 1.0, critChance: 0.55, critMultiplier: 1.8, color: 0xff0000 },
-                { cost: 25, damage: 110, attackSpeed: 0.8, critChance: 0.6, critMultiplier: 2.0, color: 0xff0000 }
-            ]
-        }
-    },
+    towerTypes: window.towerConfig,
+    
     activeAugments: [],
-    availableAugments: [
-        {
-            id: 'towers-of-rage',
-            name: 'Towers of Rage',
-            description: 'Towers gain 1% attack speed each time they attack (resets each round)',
-            effect: (tower) => {
-                tower.attackSpeed *= 1.01;
-            },
-            reset: (tower) => {
-                tower.attackSpeed = gameState.towerTypes[tower.type].ranks[tower.rank - 1].attackSpeed;
-            }
-        },
-        {
-            id: 'catapult',
-            name: 'Catapult',
-            description: 'All towers have +2 range',
-            effect: (tower) => {
-                tower.range += 2;
-                if (tower.rangeIndicator) {
-                    scene.remove(tower.rangeIndicator);
-                    tower.rangeIndicator = createRangeIndicator(tower.position, tower.range);
-                    scene.add(tower.rangeIndicator);
-                }
-            }
-        },
-        {
-            id: 'bloodbath',
-            name: 'Bloodbath',
-            description: 'All towers have 15% crit chance (+15% for Fire Towers)',
-            effect: (tower) => {
-                tower.critChance = tower.type === 'fire' ? 0.3 : 0.15;
-            }
-        },
-        {
-            id: 'hellfire',
-            name: 'Hellfire',
-            description: 'Tower attacks apply burn effect (5% health/2s)',
-            effect: (tower) => {
-                tower.burnEffect = true;
-            }
-        },
-        {
-            id: 'golden-towers',
-            name: 'Golden Towers',
-            description: '+1 gold per creep kill',
-            effect: () => {
-                gameState.goldPerKill += 1;
-            }
-        }
-    ],
+    availableAugments: window.augmentConfig.available,
+    
     workers: [],
-    workerCost: 4,
-    goldPerWorker: 1,
-    workerMiningInterval: 8, // seconds
-    workerMiningTimers: {}
+    workerCost: window.workerConfig.base.cost,
+    goldPerWorker: window.workerConfig.base.goldPerMining,
+    workerMiningInterval: window.workerConfig.base.miningInterval,
+    workerMiningTimers: {},
+
+    // Initialize paths array
+    paths: window.pathConfig.paths.map(path => ({
+        spawnPoint: new THREE.Vector3(path.spawnPoint.x, path.spawnPoint.y, path.spawnPoint.z),
+        waypoints: path.waypoints.map(wp => new THREE.Vector3(wp.x, wp.y, wp.z))
+    }))
 };
 
 // Three.js variables
@@ -327,9 +112,9 @@ function initGame() {
     const savedTowerTypes = {...gameState.towerTypes};
     
     // Reset game state
-    gameState.gold = 10;
+    gameState.gold = 100;
     gameState.kingHealth = 100;
-    gameState.currentRound = 0;
+    gameState.currentRound = 1;
     gameState.towers = [];
     gameState.creeps = [];
     gameState.projectiles = [];
@@ -344,45 +129,11 @@ function initGame() {
     gameState.activeAugments = [];
     gameState.gameActive = true;
     gameState.roundActive = false;
-    gameState.interRoundTimer = 10;
+    gameState.interRoundTimer = window.roundConfig.interRoundTimer;
+    gameState.workers = []; // Reset workers array
     
-    // Initialize the paths array
-    gameState.paths = [
-        // Left path
-        { 
-            spawnPoint: new THREE.Vector3(-15, 0, -24),
-            waypoints: [
-                new THREE.Vector3(-15, 0, -17.5),
-                new THREE.Vector3(-15, 0, -7.5),
-                new THREE.Vector3(-15, 0, 0),
-                new THREE.Vector3(-10, 0, 2.5),
-                new THREE.Vector3(0, 0, 5),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        },
-        // Center path
-        {
-            spawnPoint: new THREE.Vector3(0, 0, -24),
-            waypoints: [
-                new THREE.Vector3(0, 0, -17.5),
-                new THREE.Vector3(0, 0, -7.5),
-                new THREE.Vector3(0, 0, 0),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        },
-        // Right path
-        {
-            spawnPoint: new THREE.Vector3(15, 0, -24),
-            waypoints: [
-                new THREE.Vector3(15, 0, -17.5),
-                new THREE.Vector3(15, 0, -7.5),
-                new THREE.Vector3(15, 0, 0),
-                new THREE.Vector3(10, 0, 2.5),
-                new THREE.Vector3(0, 0, 5),
-                new THREE.Vector3(0, 0, 10)
-            ]
-        }
-    ];
+    // Initialize the paths array from config
+    gameState.paths = window.pathConfig.paths;
     
     // Restore tower types
     gameState.towerTypes = savedTowerTypes;
@@ -396,7 +147,7 @@ function initGame() {
     // Update UI
     updateUI();
     updateRoundTracker();
-    updateAugmentTracker(); // Add this line
+    updateAugmentTracker();
     
     // Setup event listeners
     setupEventListeners();
@@ -404,11 +155,27 @@ function initGame() {
     // Start game loop
     animate();
     
-    // Show augment selection at game start
+    // Show augment selection first
     showAugmentSelection();
     
-    createWorkerCamp();
-    updateBuyWorkerButton();
+    // Create worker camp and start first round only after augment selection
+    function startGameAfterAugment() {
+        // Remove the event listener
+        document.removeEventListener('augmentSelected', startGameAfterAugment);
+        
+        // Create worker camp
+        createWorkerCamp();
+        updateBuyWorkerButton();
+        updateWorkerList();
+        
+        // Start the first round with a delay to allow for scene setup
+        setTimeout(() => {
+            startRound();
+        }, 1000);
+    }
+    
+    // Listen for augment selection completion
+    document.addEventListener('augmentSelected', startGameAfterAugment);
 }
 
 // Create creep mesh without using CapsuleGeometry
@@ -724,7 +491,7 @@ function setupScene() {
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
-
+    
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(10, 20, 10);
     directionalLight.castShadow = true;
@@ -736,7 +503,7 @@ function setupScene() {
     directionalLight.shadow.camera.bottom = -50;
     directionalLight.shadow.camera.far = 100;
     scene.add(directionalLight);
-
+    
     // Add a subtle blue-tinted fill light for the forest
     const forestLight = new THREE.HemisphereLight(0x8888ff, 0x004400, 0.5);
     scene.add(forestLight);
@@ -747,7 +514,17 @@ function setupScene() {
     // Create forest environment
     createForestEnvironment();
     
-    // Create path
+    // Create paths
+    if (!gameState.paths || gameState.paths.length === 0) {
+        console.error('No paths defined in game state!');
+        if (window.pathConfig && window.pathConfig.paths) {
+            console.log('Initializing paths from config...');
+            gameState.paths = window.pathConfig.paths;
+        } else {
+            console.error('Path configuration not found!');
+            return;
+        }
+    }
     createPath();
     
     // Create king
@@ -924,16 +701,6 @@ function createWaypointMarkers(waypoints, pathGroup) {
     createWaypointLabels(waypoints);
 }
 
-// Create forest environment (simplified - only mountains)
-function createForestEnvironment() {
-    // No background elements needed
-}
-
-// Create mountains backdrop
-function createMountains() {
-    // No mountains needed
-}
-
 // Create king (modified for flat terrain)
 function createKing() {
     const kingGeometry = new THREE.SphereGeometry(1, 32, 32);
@@ -995,57 +762,46 @@ function createForestDetails() {
 
 // Create a rock
 function createRock(x, z) {
-    const rockGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const rockMaterial = new THREE.MeshPhongMaterial({ color: 0x8B4513 });
+    const rockGroup = new THREE.Group();
+    
+    // Create main rock body
+    const rockGeometry = new THREE.DodecahedronGeometry(0.8, 0);
+    const rockMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
     const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    rock.position.set(x, 0.5, z);
-    rock.userData.type = 'mining-rock'; // Add this line to identify mining rocks
-    scene.add(rock);
-}
-
-// Create a bush
-function createBush(x, z) {
-    const bushGroup = new THREE.Group();
-    const scale = Math.random() * 0.4 + 0.3;
+    rockGroup.add(rock);
     
-    // Create 3-5 spheres clustered together to form a bush
-    const numSpheres = Math.floor(Math.random() * 3) + 3;
-    
-    for (let i = 0; i < numSpheres; i++) {
-        const bushGeometry = new THREE.SphereGeometry(0.7, 8, 8);
+    // Add some smaller rocks for variety
+    for (let i = 0; i < 3; i++) {
+        const smallRockGeometry = new THREE.DodecahedronGeometry(0.3, 0);
+        const smallRockMaterial = new THREE.MeshPhongMaterial({ color: 0x909090 });
+        const smallRock = new THREE.Mesh(smallRockGeometry, smallRockMaterial);
         
-        // Random green color for the bush
-        const color = Math.random() > 0.7 ? 0x698469 : 0x4e6940;
+        // Position small rocks around the main rock
+        const angle = (i / 3) * Math.PI * 2;
+        smallRock.position.x = Math.cos(angle) * 0.5;
+        smallRock.position.z = Math.sin(angle) * 0.5;
+        smallRock.position.y = 0.2;
         
-        const bushMaterial = new THREE.MeshStandardMaterial({ 
-            color: color,
-            flatShading: true 
-        });
-        
-        const bushPart = new THREE.Mesh(bushGeometry, bushMaterial);
-        
-        // Position the sphere with slight random offsets
-        bushPart.position.set(
-            Math.random() * 0.5 - 0.25,
-            Math.random() * 0.3,
-            Math.random() * 0.5 - 0.25
-        );
-        
-        bushPart.castShadow = true;
-        bushPart.receiveShadow = true;
-        bushGroup.add(bushPart);
+        rockGroup.add(smallRock);
     }
     
-    // Position the entire bush
-    bushGroup.position.set(x, scale * 0.5, z);
-    bushGroup.scale.set(scale, scale, scale);
+    // Position the rock group
+    rockGroup.position.set(x, 0, z);
     
-    scene.add(bushGroup);
+    // Add userData to the rock group
+    rockGroup.userData = {
+        type: 'mining-rock',
+        isOccupied: false
+    };
+    
+    // Add to scene
+    scene.add(rockGroup);
+    return rockGroup;
 }
-
 
 // Generate tower slots along the path (modified for flat terrain)
 function generateTowerSlots() {
+    // Clear existing slots
     gameState.towerSlots = [];
 
     // Create tower slots at exact coordinates
@@ -1072,36 +828,18 @@ function generateTowerSlots() {
     ];
     
     slotPositions.forEach((position, index) => {
-        // Create visual representation of the slot
-        const slotGeometry = new THREE.BoxGeometry(1.5, 0.2, 1.5);
-        const slotMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x8b4513,
-            transparent: true,
-            opacity: 0.8
-        });
-        const slotMesh = new THREE.Mesh(slotGeometry, slotMaterial);
-        slotMesh.position.set(position.x, 0.1, position.z); // Positioned on the flat ground
-        slotMesh.receiveShadow = true;
-        
-        // Make the slot interactive
-        slotMesh.userData = {
-            type: 'towerSlot',
-            index: index
+        const slot = {
+            position: new THREE.Vector3(position.x, 0.1, position.z),
+            occupied: false,
+            mesh: createTowerSlotMesh()
         };
         
-        scene.add(slotMesh);
+        // Position the mesh
+        slot.mesh.position.copy(slot.position);
         
-        // Add to game state
-        gameState.towerSlots.push({
-            x: position.x,
-            y: 0.1,  // Flat ground level plus a small offset
-            z: position.z,
-            mesh: slotMesh,
-            size: 1.5,
-            occupied: false,
-            tower: null,
-            index: index
-        });
+        // Add to scene and game state
+        scene.add(slot.mesh);
+        gameState.towerSlots.push(slot);
     });
 }
 
@@ -1423,179 +1161,109 @@ function animate() {
     
     requestAnimationFrame(animate);
     
-    // Only update if not paused
+    const delta = clock.getDelta();
+    
+    // Don't update game state if paused
     if (!gameState.isPaused) {
-        const delta = clock.getDelta();
+        updateCreeps(delta);
+        updateTowers(delta);
+        updateProjectiles(delta);
+        updateWorkers(delta);
+        updateCriticalHitParticles(delta);
         
-        // Add a check to ensure delta is valid (not too large if game was paused)
-        const safeDelta = Math.min(delta, 0.1); // Cap at 0.1 seconds to prevent huge jumps
-        
-        // Update game logic with safe delta
-        updateTowers(safeDelta);
-        updateCreeps(safeDelta);
-        updateProjectiles(safeDelta);
-        updateCriticalHitParticles(safeDelta);
-        
-        // Update UI
-        updateUI();
-        
-        // Update animations
+        // Update any active animations
         if (gameState.activeAnimations) {
             for (let i = gameState.activeAnimations.length - 1; i >= 0; i--) {
                 const animation = gameState.activeAnimations[i];
-                const continueAnimation = animation(safeDelta);
-                if (!continueAnimation) {
+                const finished = animation(delta);
+                if (finished) {
                     gameState.activeAnimations.splice(i, 1);
                 }
             }
         }
-        
-        updateWorkers(delta);
     }
     
-    // Always render the scene (even when paused)
+    // Always render
     renderer.render(scene, camera);
 }
 
 // Create a range indicator for towers
 function createRangeIndicator(position, range) {
-    // Create the actual circle geometry aligned with gameplay logic
-    const geometry = new THREE.RingGeometry(range - 0.2, range, 32);
-    const material = new THREE.MeshBasicMaterial({ 
-        color: 0x00ffff, 
+    // Create a ring geometry for the range indicator
+    const ringGeometry = new THREE.RingGeometry(range - 0.1, range, 32);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
         transparent: true, 
         opacity: 0.3,
         side: THREE.DoubleSide
     });
     
-    const rangeIndicator = new THREE.Mesh(geometry, material);
-    
-    // Important: Position correctly in 3D space
-    rangeIndicator.rotation.x = -Math.PI / 2; // Rotate to horizontal
-    rangeIndicator.position.set(position.x, 0.1, position.z); // Position just above ground
+    const rangeIndicator = new THREE.Mesh(ringGeometry, ringMaterial);
+    rangeIndicator.rotation.x = -Math.PI / 2; // Lay flat on the ground
+    rangeIndicator.position.copy(position);
+    rangeIndicator.userData.type = 'rangeIndicator';
     
     return rangeIndicator;
 }
 
 // Function to spawn a creep on a specific path
 function spawnCreepOnPath(pathIndex) {
-    try {
-        const path = gameState.paths[pathIndex];
-        if (!path) {
-            console.error("Invalid path index:", pathIndex);
-            return;
-        }
-
-        // Get the current round definition (using current round index - 1 since we increment at end of startRound)
-        const roundIndex = gameState.currentRound - 1;
-        const roundDef = gameState.roundDefinitions[roundIndex];
-        if (!roundDef) {
-            console.error("Invalid round definition for round:", gameState.currentRound);
-            return;
-        }
-        const creepType = roundDef.type;
-
-        // Create creep mesh with the correct type
-        const creepMesh = createCreepMesh(creepType);
-        // Set initial position at spawn point
-        creepMesh.position.set(
-            path.spawnPoint.x,
-            0.5, // Keep constant height
-            path.spawnPoint.z
-        );
-        scene.add(creepMesh);
-        
-        // Set type-specific properties
-        let health, damage, speed;
-        
-        // Base values without any multipliers for round 1
-        switch(creepType) {
-            case 'fast':
-                health = 40;
-                damage = 2;
-                speed = 3.45;
-                break;
-            case 'armored':
-                health = 75;
-                damage = 2;
-                speed = 1.725;
-                break;
-            case 'swarm':
-                health = 30;
-                damage = 1;
-                speed = 2.53;
-                break;
-            case 'boss':
-                health = 750; // Boss has 750 HP
-                damage = 5; // Boss deals more damage
-                speed = 1.5; // Boss moves slower
-                break;
-        }
-        
-        // Only apply difficulty scaling if we're past round 1
-        if (gameState.currentRound > 1) {
-            const difficultyMultiplier = Math.pow(1.5, gameState.currentRound - 1);
-            health = Math.round(health * difficultyMultiplier);
-        }
-        
-        // Create creep object with all required properties
-        const creep = {
-            mesh: creepMesh,
-            position: new THREE.Vector3(path.spawnPoint.x, 0.5, path.spawnPoint.z),
-            progress: 0,
-            health: health,
-            maxHealth: health,
-            baseSpeed: speed,
-            speed: speed,
-            slowEffects: [],
-            effects: {
-                slow: [],
-                burn: null
-            },
-            reachedKing: false,
-            damageToKing: damage,
-            creepType: creepType,
-            pathIndex: pathIndex,
-            path: path,
-            currentWaypoint: 0
-        };
-        
-        // Create health bar and attach it to the monster
-        const healthBarGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
-        const healthBarMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        creep.healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
-        // Position health bar higher for boss creeps
-        creep.healthBar.position.set(0, creepType === 'boss' ? 2.4 : 1.2, 0);
-        creep.healthBar.renderOrder = 1; // Ensure health bar renders on top
-        creepMesh.add(creep.healthBar);
-
-        // Add billboard behavior to make health bar always face camera
-        creep.healthBar.update = function() {
-            // Get the creep's position
-            const creepPosition = creep.mesh.position;
-            
-            // Get the camera's position
-            const cameraPosition = camera.position;
-            
-            // Calculate direction from creep to camera
-            const direction = new THREE.Vector3();
-            direction.subVectors(cameraPosition, creepPosition).normalize();
-            
-            // Make the health bar face the camera
-            this.lookAt(cameraPosition);
-            
-            // Keep the health bar horizontal by resetting X and Z rotation
-            this.rotation.x = 0;
-            this.rotation.z = 0;
-        };
-        
-        // Add to game state
-        gameState.creeps.push(creep);
-        
-        console.log(`Spawned ${creepType} creep with ${health} health for round ${gameState.currentRound + 1}`);
-    } catch (error) {
-        console.error("Error spawning creep:", error);
+    if (!gameState.paths[pathIndex]) {
+        console.error('Invalid path index:', pathIndex);
+        return;
     }
+    
+    // Get current round definition
+    const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+    if (!roundDef) {
+        console.error('Invalid round definition');
+        return;
+    }
+    
+    // Get creep type definition
+    const creepTypeDef = window.creepConfig.types[roundDef.type];
+    if (!creepTypeDef) {
+        console.error('Invalid creep type:', roundDef.type);
+        return;
+    }
+    
+    // Get spawn point
+    const spawnPoint = gameState.paths[pathIndex].spawnPoint;
+    if (!spawnPoint) {
+        console.error('Invalid spawn point for path:', pathIndex);
+        return;
+    }
+    
+    // Initialize position as Vector3
+    const position = new THREE.Vector3(spawnPoint.x, 0.5, spawnPoint.z);
+    
+    // Create creep
+    const creep = {
+        type: roundDef.type,
+        health: creepTypeDef.baseStats.health,
+        maxHealth: creepTypeDef.baseStats.health,
+        speed: creepTypeDef.baseStats.speed,
+        goldValue: creepTypeDef.baseStats.goldValue,
+        damageToKing: creepTypeDef.baseStats.damageToKing,
+        pathIndex: pathIndex,
+        currentWaypointIndex: 0,
+        position: position.clone(), // Initialize position as Vector3
+        mesh: createCreepMesh(roundDef.type),
+        effects: {
+            slow: null,
+            burn: null
+        }
+    };
+    
+    // Set mesh position to match creep position
+    creep.mesh.position.copy(position);
+    
+    // Add to scene and game state
+    scene.add(creep.mesh);
+    gameState.creeps.push(creep);
+    
+    // Debug log
+    console.log(`Spawned ${roundDef.type} creep on path ${pathIndex}`);
 }
 
 // Update creep's slow effects (reduce durations, remove expired effects)
@@ -1839,126 +1507,48 @@ function updateCreepSpeed(creep) {
 
 // Update creeps
 function updateCreeps(delta) {
-    // Skip update if no creeps
-    if (gameState.creeps.length === 0) {
-        // Add debug logging for round end conditions
-        if (gameState.roundActive) {
-            console.log("Round end check - Active creeps:", gameState.creeps.length, 
-                       "Creeps to spawn:", gameState.creepsToSpawn, 
-                       "Round active:", gameState.roundActive);
-            // Check for round end when no creeps are present
-            if (gameState.creepsToSpawn === 0) {
-                console.log("No creeps and no more to spawn, ending round");
-                endRound();
-            }
-        }
-        return;
-    }
-
-    // Update burn effects
-    for (let i = gameState.creeps.length - 1; i >= 0; i--) {
-        const creep = gameState.creeps[i];
-        if (creep.effects.burn) {
-            creep.health -= creep.effects.burn.damage * delta;
-            if (creep.health <= 0) {
-                // Add gold for kill
-                gameState.gold += gameState.goldPerKill;
-                updateGold();
-                
-                // Remove creep from scene and game state
-                scene.remove(creep.mesh);
-                gameState.creeps.splice(i, 1);
-                
-                // Check for round end after creep death
-                if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
-                    console.log("Round end triggered by creep death");
-                    endRound();
-                    return;
-                }
-            }
-        }
-    }
-
-    // Update slow effects
-    for (let i = 0; i < gameState.creeps.length; i++) {
-        updateCreepSlowEffects(gameState.creeps[i], delta);
-    }
-
-    // Move creeps along their paths
     for (let i = gameState.creeps.length - 1; i >= 0; i--) {
         const creep = gameState.creeps[i];
         
-        if (!creep.path || !creep.path.waypoints) {
-            console.error("Creep has invalid path:", creep);
+        // Get the path for this creep
+        const path = gameState.paths[creep.pathIndex];
+        if (!path) {
+            console.error('Creep has invalid path:', creep);
             continue;
         }
 
-        const currentWaypoint = creep.path.waypoints[creep.currentWaypoint];
-        const nextWaypoint = creep.path.waypoints[creep.currentWaypoint + 1];
+        // Get current and next waypoint
+        const currentWaypoint = path.waypoints[creep.currentWaypointIndex];
+        const nextWaypoint = path.waypoints[creep.currentWaypointIndex + 1];
 
         if (!nextWaypoint) {
-            // Creep reached the king
-            if (!creep.reachedKing) {
-                creep.reachedKing = true;
-                gameState.kingHealth -= creep.damageToKing;
-                updateKingHealth();
-                console.log("Creep reached king. King health:", gameState.kingHealth);
-                
-                // Check for game over
-                if (gameState.kingHealth <= 0) {
-                    showGameOverScreen(false);
-                    return;
-                }
-            }
-            
-            // Remove creep after dealing damage
+            // Creep reached the end
+            gameState.kingHealth -= creep.damageToKing || 10;
+            updateKingHealth();
             scene.remove(creep.mesh);
             gameState.creeps.splice(i, 1);
-            
-            // Check if round should end
-            if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
-                console.log("Round end triggered by creep reaching king");
-                endRound();
-                return;
-            }
+            gameState.creepsReachedEnd++;
             continue;
         }
 
-        // Calculate direct differences in coordinates
-        const dx = nextWaypoint.x - creep.mesh.position.x;
-        const dz = nextWaypoint.z - creep.mesh.position.z;
-        
-        // Calculate actual distance using Pythagorean theorem
-        const distance = Math.sqrt(dx * dx + dz * dz);
-        
-        // Calculate how far the creep should move this frame
-        const moveDistance = creep.speed * delta;
-        
-        // Calculate the ratio of movement
-        const ratio = moveDistance / distance;
-        
-        // Move the creep
-        creep.mesh.position.x += dx * ratio;
-        creep.mesh.position.z += dz * ratio;
-        
-        // Update creep's position vector
-        creep.position.copy(creep.mesh.position);
-        
-        // Update health bar position
-        if (creep.healthBar) {
-            creep.healthBar.update();
-        }
-        
-        // Check if we've reached the next waypoint
-        if (distance < 0.1) {
-            creep.currentWaypoint++;
-        }
-    }
+        // Ensure waypoints are Vector3s
+        const nextWaypointVec = nextWaypoint instanceof THREE.Vector3 ? 
+            nextWaypoint : new THREE.Vector3(nextWaypoint.x, nextWaypoint.y, nextWaypoint.z);
 
-    // Final round end check
-    if (gameState.roundActive && gameState.creeps.length === 0 && gameState.creepsToSpawn === 0) {
-        console.log("Round end triggered by final check");
-        endRound();
+        // Calculate direction to next waypoint
+        const direction = new THREE.Vector3();
+        direction.subVectors(nextWaypointVec, creep.position).normalize();
+        
+        // Update creep position
+        const distance = creep.speed * delta;
+        creep.position.add(direction.multiplyScalar(distance));
+        creep.mesh.position.copy(creep.position);
+        
+        // Check if we reached the next waypoint
+        const distanceToWaypoint = creep.position.distanceTo(nextWaypointVec);
+        if (distanceToWaypoint < 0.1) {
+            creep.currentWaypointIndex++;
+        }
     }
 }
 
@@ -2079,248 +1669,224 @@ function cleanupAndRestartGame() {
 
 // Toggle ESC menu
 function toggleEscMenu() {
-    console.log("Toggling ESC menu");
-    const escMenu = document.getElementById('esc-menu');
+    if (!gameState.gameActive) return;
     
-    if (escMenu.classList.contains('hidden')) {
-        // Show menu and pause game
-        pauseGame();
-        escMenu.classList.remove('hidden');
-    } else {
-        // Hide menu and resume game
+    if (gameState.isPaused) {
         resumeGame();
+    } else {
+        pauseGame();
     }
 }
 
 function pauseGame() {
-    console.log("Game paused");
-    gameState.isPaused = true;
+    if (!gameState.gameActive || gameState.isPaused) return;
     
-    // Stop the timer
-    if (gameState.timerInterval) {
-        clearInterval(gameState.timerInterval);
+    gameState.isPaused = true;
+    gameState.pauseStartTime = Date.now();
+    
+    // Pause all timers
+    if (gameState.roundTimer) clearInterval(gameState.roundTimer);
+    if (gameState.spawnTimer) clearInterval(gameState.spawnTimer);
+    if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+    
+    // Show pause menu and backdrop
+    const pauseMenu = document.getElementById('esc-menu');
+    const pauseBackdrop = document.getElementById('esc-menu-backdrop');
+    
+    if (pauseMenu) {
+        pauseMenu.classList.remove('hidden');
+        pauseMenu.style.zIndex = '1000';
+    }
+    
+    if (pauseBackdrop) {
+        pauseBackdrop.classList.remove('hidden');
+        pauseBackdrop.style.zIndex = '999';
     }
 }
 
 // And resumeGame function:
 function resumeGame() {
-    console.log("Game resumed");
-    const escMenu = document.getElementById('esc-menu');
-    escMenu.classList.add('hidden');
+    if (!gameState.gameActive || !gameState.isPaused) return;
     
+    const pauseDuration = Date.now() - gameState.pauseStartTime;
     gameState.isPaused = false;
-    gameState.gameActive = true;
     
-    // Restart timer if needed
-    if (!gameState.roundActive && gameState.interRoundTimer > 0) {
+    // Hide pause menu and backdrop
+    const pauseMenu = document.getElementById('esc-menu');
+    const pauseBackdrop = document.getElementById('esc-menu-backdrop');
+    
+    if (pauseMenu) {
+        pauseMenu.classList.add('hidden');
+        pauseMenu.style.zIndex = 'auto';
+    }
+    
+    if (pauseBackdrop) {
+        pauseBackdrop.classList.add('hidden');
+        pauseBackdrop.style.zIndex = 'auto';
+    }
+    
+    // Adjust timers based on pause duration
+    if (gameState.roundActive && gameState.roundStartTime) {
+        gameState.roundStartTime += pauseDuration;
+        
+        // Restart round timer
+        gameState.roundTimer = setInterval(() => {
+            const elapsed = (Date.now() - gameState.roundStartTime) / 1000;
+            updateRoundTimer();
+            
+            const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+            if (roundDef && elapsed >= roundDef.duration) {
+                endRound();
+            }
+        }, 1000);
+    } else if (!gameState.roundActive) {
+        // Restart inter-round timer
         startInterRoundTimer();
     }
+    
+    // Reset clock to prevent large delta times
+    clock.getDelta();
 }
 
 // Complete buildTower function implementation
 function buildTower(towerType) {
-    console.log("buildTower called with type:", towerType);
+    if (!gameState.selectedTowerSlot || !gameState.gold) return;
     
-    // Check if slot is selected
-    if (!gameState.selectedTowerSlot) {
-        console.error("No tower slot selected");
+    const towerConfig = window.towerConfig[towerType];
+    if (!towerConfig) {
+        console.error('Invalid tower type:', towerType);
         return;
     }
     
-    // Remove range indicator if present
-    if (gameState.towerSlotRangeIndicator) {
-        scene.remove(gameState.towerSlotRangeIndicator);
-        gameState.towerSlotRangeIndicator = null;
-    }
-    
-    // Get tower data
-    const towerData = gameState.towerTypes[towerType];
-    if (!towerData) {
-        console.error("Invalid tower type:", towerType);
+    const baseRank = towerConfig.ranks[0];
+    const towerCost = baseRank.cost;
+    if (gameState.gold < towerCost) {
+        console.log('Not enough gold to build tower');
         return;
     }
     
-    const towerRank = towerData.ranks[0];
+    // Deduct gold
+    gameState.gold -= towerCost;
+    updateGold();
     
-    // Check if we have enough gold
-    if (gameState.gold < towerRank.cost) {
-        console.error("Not enough gold to build tower");
-        return;
-    }
-    
-    // Get slot
-    const slot = gameState.selectedTowerSlot;
-    console.log("Building tower at slot:", slot);
-    
-    try {
-    // Create tower mesh
-    const towerMesh = createTowerMesh(towerType, 1);
-        towerMesh.position.set(slot.x, slot.y + 1, slot.z);
-    scene.add(towerMesh);
-    
-        // Create tower object
+    // Create tower
     const tower = {
-        mesh: towerMesh,
         type: towerType,
         rank: 1,
-        damage: towerRank.damage,
-        attackSpeed: towerRank.attackSpeed,
-        attackCooldown: 0,
-        range: 8,
-        position: { x: slot.x, y: slot.y + 1, z: slot.z },
-        slotIndex: slot.index,
-        totalCost: towerRank.cost,
-        targetCreep: null
+        position: gameState.selectedTowerSlot.position.clone(),
+        damage: baseRank.damage,
+        attackSpeed: baseRank.attackSpeed,
+        range: 8, // Default range
+        attackTimer: 0,
+        mesh: createTowerMesh(towerType, 1)
     };
     
-    // Add special properties for specific tower types
+    // Add special properties based on tower type
     if (towerType === 'frost') {
-        tower.slowEffect = towerRank.slowEffect;
-    } else if (towerType === 'fire') {
-        tower.critChance = towerRank.critChance;
-        tower.critMultiplier = towerRank.critMultiplier;
+        tower.slowAmount = baseRank.slowAmount;
     }
     
-    // Add tower to game
+    // Position tower
+    tower.mesh.position.copy(gameState.selectedTowerSlot.position);
+    
+    // Add to scene and game state
+    scene.add(tower.mesh);
     gameState.towers.push(tower);
     
     // Mark slot as occupied
-    slot.occupied = true;
-    slot.tower = tower;
-    
-    // Deduct gold
-    gameState.gold -= towerRank.cost;
-    
-    // Update stats
-    gameState.towerCount++;
-    gameState.towersBuilt++;
+    gameState.selectedTowerSlot.occupied = true;
     
     // Update UI
-    updateGold();
     updateTowerCount();
+    updateTotalDamage();
     
-    // Hide tower selection
-    document.getElementById('tower-selection').classList.add('hidden');
-        document.getElementById('tower-selection-backdrop').classList.add('hidden');
-    gameState.selectedTowerSlot = null;
+    // Hide tower selection modal
+    const towerSelection = document.getElementById('tower-selection');
+    const towerSelectionBackdrop = document.getElementById('tower-selection-backdrop');
     
-    console.log("Tower built successfully:", tower);
-    } catch (error) {
-        console.error("Error building tower:", error);
+    if (towerSelection && towerSelectionBackdrop) {
+        towerSelection.classList.add('hidden');
+        towerSelectionBackdrop.classList.add('hidden');
     }
+    
+    // Clear selection and range indicator
+    gameState.selectedTowerSlot = null;
+    clearAllRangeIndicators();
 }
 
 // Update towers
 function updateTowers(delta) {
-    gameState.towers.forEach(tower => {
-        // Update attack cooldown
-        tower.attackCooldown += delta;
+    for (const tower of gameState.towers) {
+        // Update attack timer
+        tower.attackTimer = (tower.attackTimer || 0) + delta;
         
         // Check if tower can attack
-        if (tower.attackCooldown >= tower.attackSpeed) {
+        if (tower.attackTimer >= tower.attackSpeed) {
             // Find target(s)
             const targets = findTarget(tower);
             
-            if (targets) {
-                // Handle both single target and multi-target cases
-                if (Array.isArray(targets)) {
-                    // Multi-target (basic tower)
-                    // First target takes full damage
-                    fireProjectile(tower, targets[0], 1.0);
-                    // Second target takes 50% damage
-                    if (targets[1]) {
-                        fireProjectile(tower, targets[1], 0.5);
-                    }
-                } else {
-                    // Single target (other towers)
-                    fireProjectile(tower, targets);
-                }
-                
-                // Reset attack cooldown
-                tower.attackCooldown = 0;
+            if (Array.isArray(targets)) {
+                // Basic tower can hit multiple targets
+                targets.forEach(target => {
+                    if (target) fireProjectile(tower, target);
+                });
+            } else if (targets) {
+                // Single target for other tower types
+                fireProjectile(tower, targets);
+            }
+            
+            // Reset attack timer if any target was found
+            if ((Array.isArray(targets) && targets.length > 0) || targets) {
+                tower.attackTimer = 0;
             }
         }
-    });
+    }
+}
+
+function findTarget(tower) {
+    let closestCreep = null;
+    let closestDistance = tower.range;
+    
+    for (const creep of gameState.creeps) {
+        const distance = getDistance3D(tower.mesh.position, creep.mesh.position);
+        
+        if (distance <= tower.range) {
+            if (distance < closestDistance) {
+                closestDistance = distance;
+                closestCreep = creep;
+            }
+        }
+    }
+    
+    return closestCreep;
 }
 
 // 5. Fire projectile with proper color and effects
 function fireProjectile(tower, target, damageMultiplier = 1) {
-    // Safety check for target and its mesh
     if (!target || !target.mesh || !target.mesh.position) {
-        console.log("No valid target for projectile - missing mesh or position");
+        console.log('No valid target for projectile - missing mesh or position');
         return;
-    }
-
-    // Calculate damage with augment effects
-    let damage = gameState.towerTypes[tower.type].ranks[tower.rank - 1].damage * damageMultiplier;
-    let isCritical = false;
-    
-    // Check for critical hit (base tower crit or Bloodbath augment)
-    if (tower.type === 'fire' || gameState.activeAugments.includes('bloodbath')) {
-        let critChance = tower.type === 'fire' ? 
-            gameState.towerTypes[tower.type].ranks[tower.rank - 1].critChance : 0.15;
-        let critMultiplier = tower.type === 'fire' ? 
-            gameState.towerTypes[tower.type].ranks[tower.rank - 1].critMultiplier : 1.5;
-            
-        // Apply Bloodbath augment if active
-        if (gameState.activeAugments.includes('bloodbath')) {
-            critChance = tower.type === 'fire' ? 0.9 : 0.3;
-            critMultiplier = tower.type === 'fire' ? 1.65 : 1.5;
-        }
-        
-        if (Math.random() < critChance) {
-            damage *= critMultiplier;
-            isCritical = true;
-        }
     }
     
     // Create projectile
     const projectile = {
-        mesh: createProjectileMesh(gameState.towerTypes[tower.type].ranks[tower.rank - 1].color),
+        mesh: createProjectileMesh(window.towerConfig[tower.type].ranks[tower.rank - 1].color),
+        position: tower.mesh.position.clone(),
         target: target,
-        damage: damage,
-        speed: 15,
-        position: { 
-            x: tower.position.x, 
-            y: tower.position.y + 1, 
-            z: tower.position.z 
-        },
-        direction: { x: 0, y: 0, z: 0 },
-        reached: false,
-        isCritical: isCritical,
-        type: tower.type
+        speed: 20,
+        damage: tower.damage * damageMultiplier,
+        towerType: tower.type,
+        towerRank: tower.rank,
+        reached: false
     };
-    
-    // Calculate direction to target using mesh position
-    const dx = target.mesh.position.x - tower.position.x;
-    const dy = target.mesh.position.y - tower.position.y;
-    const dz = target.mesh.position.z - tower.position.z;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    
-    if (distance === 0) {
-        console.log("Target is at same position as tower, skipping projectile");
-        return;
-    }
-    
-    projectile.direction.x = dx / distance;
-    projectile.direction.y = dy / distance;
-    projectile.direction.z = dz / distance;
-    
-    // Position projectile at tower
-    projectile.mesh.position.set(
-        projectile.position.x,
-        projectile.position.y,
-        projectile.position.z
-    );
+
+    // Position projectile at tower's top
+    projectile.mesh.position.copy(projectile.position);
+    projectile.mesh.position.y += 2; // Start from tower's top
     
     // Add to scene and game state
     scene.add(projectile.mesh);
     gameState.projectiles.push(projectile);
-    
-    // Apply Towers of Rage augment if active
-    if (gameState.activeAugments.includes('towers-of-rage')) {
-        tower.attackSpeed *= 1.05;
-    }
 }
 
 // 6. Update projectiles to apply slow effect on hit
@@ -2495,104 +2061,169 @@ function getDistance3D(point1, point2) {
 }
 
 function startRound() {
-    // Increment round counter at the start
-    gameState.currentRound++;
-    
-    // Get current round definition (using 0-based index)
-    const roundIndex = gameState.currentRound - 1;
-    const currentRoundDef = gameState.roundDefinitions[roundIndex];
-    if (!currentRoundDef) {
-        console.error("Invalid round definition for round:", gameState.currentRound);
+    if (!gameState.gameActive || gameState.roundActive) {
+        console.log('Cannot start round:', { gameActive: gameState.gameActive, roundActive: gameState.roundActive });
         return;
     }
     
-    // Set round as active
-    gameState.roundActive = true;
-    gameState.isPaused = false;
-    
-    // Clear any existing timer
-    if (gameState.timerInterval) {
-        clearInterval(gameState.timerInterval);
-        gameState.timerInterval = null;
-    }
-    
-    // Calculate number of creeps to spawn based on round type
-    if (currentRoundDef.type === 'boss') {
-        // Boss rounds only spawn one boss
-        gameState.creepsToSpawn = 1;
-    } else {
-        // Regular rounds spawn multiple creeps
-        const baseCreeps = 5;
-        const roundBonus = Math.min(gameState.currentRound, 10);
-        gameState.creepsToSpawn = baseCreeps + roundBonus;
-    }
-    
-    console.log("Creeps to spawn:", gameState.creepsToSpawn);
-    
-    // Spawn creeps with delay
-    let spawnCount = 0;
-    const spawnInterval = setInterval(() => {
-        if (spawnCount < gameState.creepsToSpawn) {
-            // For boss rounds, spawn in the center path
-            if (currentRoundDef.type === 'boss') {
-                spawnCreepOnPath(1); // Center path
-            } else {
-                // Randomly select a path for regular creeps
-                const pathIndex = Math.floor(Math.random() * gameState.paths.length);
-                spawnCreepOnPath(pathIndex);
-            }
-            spawnCount++;
-            console.log("Spawned creep", spawnCount, "of", gameState.creepsToSpawn);
-        } else {
-            clearInterval(spawnInterval);
-            gameState.creepsToSpawn = 0; // Only set to 0 when all creeps are spawned
-            console.log("Finished spawning all creeps");
-        }
-    }, 500); // Reduced from 1000ms to 500ms for faster spawning
-    
-    // Start round timer
-    gameState.roundTimer = 0;
+    // Start with inter-round timer
+    gameState.interRoundTimer = 10;
     updateRoundTimer();
     
-    // Check for game over
-    if (gameState.currentRound > gameState.maxRounds) {
-        showGameOverScreen(true);
+    // Set up timer to start the round after delay
+    const timerInterval = setInterval(() => {
+        if (gameState.isPaused) return;
+        
+        gameState.interRoundTimer--;
+        updateRoundTimer();
+        
+        if (gameState.interRoundTimer <= 0) {
+            clearInterval(timerInterval);
+            startRoundSpawning();
+        }
+    }, 1000);
+    
+    gameState.timerInterval = timerInterval;
+}
+
+function startRoundSpawning() {
+    console.log('Starting round:', gameState.currentRound);
+    
+    // Get current round definition
+    const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+    if (!roundDef) {
+        console.error('Invalid round definition for round:', gameState.currentRound);
         return;
     }
     
-    // Update round tracker and counter
-    updateRoundTracker();
-    updateRoundCounter();
-    gameState.damageInCurrentSecond = 0;
-    gameState.currentDPS = 0;
-    gameState.lastDPSUpdateTime = performance.now() / 1000;
+    // Get spawn pattern for this round type
+    const spawnPattern = window.roundConfig.spawnPatterns[roundDef.type];
+    if (!spawnPattern) {
+        console.error('No spawn pattern found for round type:', roundDef.type);
+        return;
+    }
+    
+    // Calculate round duration based on spawn pattern
+    const spawnDuration = spawnPattern.totalCreeps * spawnPattern.spawnInterval;
+    const bufferTime = 30; // 30 seconds buffer for creeps to reach the end
+    roundDef.duration = spawnDuration + bufferTime;
+    
+    // Set round state
+    gameState.roundActive = true;
+    gameState.roundStartTime = Date.now();
+    gameState.creepsSpawned = 0;
+    gameState.creepsKilled = 0;
+    gameState.creepsReachedEnd = 0;
+    
+    // Clear any existing timers
+    if (gameState.roundTimer) clearInterval(gameState.roundTimer);
+    if (gameState.spawnTimer) clearInterval(gameState.spawnTimer);
+    
+    console.log(`Round ${gameState.currentRound} configuration:`, {
+        type: roundDef.type,
+        creepsToSpawn: spawnPattern.totalCreeps,
+        spawnInterval: spawnPattern.spawnInterval,
+        duration: roundDef.duration
+    });
+    
+    // Spawn first creep
+    const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+    spawnCreepOnPath(pathIndex);
+    gameState.creepsSpawned++;
+    console.log(`Spawned first creep on path ${pathIndex}`);
+    
+    // Set up spawn timer for remaining creeps
+    gameState.spawnTimer = setInterval(() => {
+        if (!gameState.isPaused) {
+            if (gameState.creepsSpawned < spawnPattern.totalCreeps) {
+                const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+                spawnCreepOnPath(pathIndex);
+                gameState.creepsSpawned++;
+                console.log(`Spawned creep ${gameState.creepsSpawned}/${spawnPattern.totalCreeps} on path ${pathIndex}`);
+            } else {
+                clearInterval(gameState.spawnTimer);
+                console.log('Finished spawning all creeps for this round');
+            }
+        }
+    }, spawnPattern.spawnInterval * 1000);
+}
+
+function updateRoundTimer() {
+    const timerElement = document.getElementById('round-timer');
+    if (!timerElement) return;
+    
+    if (!gameState.gameActive) {
+        timerElement.textContent = 'Game not active';
+        return;
+    }
+    
+    if (!gameState.roundActive) {
+        // Show inter-round countdown
+        const timer = Math.max(0, Math.floor(gameState.interRoundTimer));
+        timerElement.textContent = `Next round in: ${timer}s`;
+    } else {
+        // Show current round number
+        timerElement.textContent = `Round: ${gameState.currentRound}/${window.roundConfig.maxRounds}`;
+    }
 }
 
 function endRound() {
-    console.log("Ending round", gameState.currentRound);
+    if (!gameState.roundActive) return;
     
-    // Clear any existing timer
-    if (gameState.timerInterval) {
-        clearInterval(gameState.timerInterval);
-        gameState.timerInterval = null;
+    // Clear round timer
+    if (gameState.roundTimer) {
+        clearInterval(gameState.roundTimer);
+        gameState.roundTimer = null;
     }
     
-    // Reset round-specific augments
-    resetRoundAugments();
+    // Clear spawn timer
+    if (gameState.spawnTimer) {
+        clearInterval(gameState.spawnTimer);
+        gameState.spawnTimer = null;
+    }
     
-    // Set round as inactive
-    gameState.roundActive = false;
+    // Check if round was successful
+    const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+    const success = gameState.creepsReachedEnd < roundDef.maxCreepsReached;
     
-    // Check if we should show augment selection (Round 6 or game start)
-    if (gameState.currentRound === 6 || gameState.currentRound === 0) {
-        // Pause the game
-        gameState.isPaused = true;
-        // Show augment selection
-        showAugmentSelection();
-    } else {
-        // Start inter-round timer for other rounds
+    if (success) {
+        // Round completed successfully
+        gameState.currentRound++;
+        gameState.roundsCompleted++;
+        
+        // Check for game victory
+        if (gameState.currentRound > window.roundConfig.maxRounds) {
+            showGameOverScreen(true);
+            return;
+        }
+        
+        // Start inter-round timer
         startInterRoundTimer();
+    } else {
+        // Round failed
+        showGameOverScreen(false);
     }
+    
+    // Reset round state
+    gameState.roundActive = false;
+    gameState.roundStartTime = null;
+    gameState.creepsSpawned = 0;
+    gameState.creepsKilled = 0;
+    gameState.creepsReachedEnd = 0;
+    
+    // Clear all creeps
+    gameState.creeps.forEach(creep => {
+        scene.remove(creep.mesh);
+    });
+    gameState.creeps = [];
+    
+    // Clear all projectiles
+    gameState.projectiles.forEach(projectile => {
+        scene.remove(projectile.mesh);
+    });
+    gameState.projectiles = [];
+    
+    console.log(`Round ${gameState.currentRound - 1} ended. Success: ${success}`);
 }
 
 function startInterRoundTimer() {
@@ -2628,87 +2259,39 @@ function startInterRoundTimer() {
 
 // 9. Tower selection display function to show frost tower's slow effect
 function selectTower(tower) {
-    // If there was a previously selected tower, remove its range indicator
-    if (gameState.selectedTower && gameState.selectedTower.rangeIndicator) {
-        scene.remove(gameState.selectedTower.rangeIndicator);
-        gameState.selectedTower.rangeIndicator = null;
-    }
+    // Clear previous selections and indicators
+    clearAllRangeIndicators();
     
-    // Also remove any slot range indicator if it exists
-    if (gameState.towerSlotRangeIndicator) {
-        scene.remove(gameState.towerSlotRangeIndicator);
-        gameState.towerSlotRangeIndicator = null;
-    }
-    
+    // Update selected tower
     gameState.selectedTower = tower;
+    gameState.selectedTowerSlot = null;
     
-    // Create and add range indicator
-    tower.rangeIndicator = createRangeIndicator(tower.position, tower.range);
-    scene.add(tower.rangeIndicator);
-    
-    // Hide tower selection menu
-    document.getElementById('tower-selection').classList.add('hidden');
-    
-    // Show tower actions menu
+    // Show tower actions modal
     const towerActions = document.getElementById('tower-actions');
+    const towerSelectionBackdrop = document.getElementById('tower-selection-backdrop');
+    
+    if (towerActions && towerSelectionBackdrop) {
     towerActions.classList.remove('hidden');
+        towerSelectionBackdrop.classList.remove('hidden');
     
     // Update tower details
-    const towerType = gameState.towerTypes[tower.type];
-    
-    document.getElementById('tower-details-icon').style.backgroundColor = '#' + tower.mesh.material.color.getHexString();
-    document.getElementById('tower-details-name').textContent = `${towerType.name}`;
-    
-    // Show damage per target for basic towers
-    if (tower.type === 'basic') {
-        document.getElementById('tower-details-damage').textContent = `Damage: ${tower.damage} (${Math.floor(tower.damage * 0.5)} per target)`;
-    } else {
+        document.getElementById('tower-details-name').textContent = `${tower.type.charAt(0).toUpperCase() + tower.type.slice(1)} Tower`;
         document.getElementById('tower-details-damage').textContent = `Damage: ${tower.damage}`;
-    }
-    
     document.getElementById('tower-details-speed').textContent = `Attack Speed: ${tower.attackSpeed}s`;
     document.getElementById('tower-details-rank').textContent = `Rank: ${tower.rank}`;
     
-    // Display special stats for specific tower types
-    const towerInfoDiv = document.getElementById('tower-details-info');
-    
-    // Remove any existing special stat if it exists
-    const existingSpecialStat = document.getElementById('tower-details-special');
-    if (existingSpecialStat) {
-        towerInfoDiv.removeChild(existingSpecialStat);
-    }
-    
-    // Add special stat for frost tower
-    if (tower.type === 'frost') {
-        const specialStat = document.createElement('div');
-        specialStat.id = 'tower-details-special';
-        specialStat.textContent = `Slow Effect: ${tower.slowEffect * 100}%`;
-        specialStat.style.color = '#add8e6'; // Light blue for frost effect
-        towerInfoDiv.appendChild(specialStat);
-    }
-    
-    // Update upgrade button
-    const upgradeButton = document.getElementById('upgrade-tower');
-    if (tower.rank < 5) {
-        const upgradeCost = towerType.ranks[tower.rank].cost;
-        upgradeButton.textContent = `Upgrade (${upgradeCost} Gold)`;
+        // Update upgrade and sell costs
+        const upgradeCost = window.towerConfig[tower.type].ranks[tower.rank].cost;
+        const sellValue = Math.floor(upgradeCost * 0.75);
         
-        if (gameState.gold < upgradeCost) {
-            upgradeButton.disabled = true;
-            upgradeButton.style.opacity = '0.5';
-        } else {
-            upgradeButton.disabled = false;
-            upgradeButton.style.opacity = '1';
-        }
-    } else {
-        upgradeButton.textContent = `Rank ${tower.rank}/5`;
-        upgradeButton.disabled = true;
-        upgradeButton.style.opacity = '0.5';
+        document.getElementById('upgrade-tower').textContent = `Upgrade (${upgradeCost} Gold)`;
+        document.getElementById('sell-tower').textContent = `Sell (${sellValue} Gold)`;
     }
     
-    // Update sell button
-    const sellAmount = Math.floor(tower.totalCost * 0.75);
-    document.getElementById('sell-tower').textContent = `Sell (${sellAmount} Gold)`;
+    // Create range indicator for the tower
+    const rangeIndicator = createRangeIndicator(tower.mesh.position, tower.range);
+    rangeIndicator.userData.type = 'rangeIndicator';
+    scene.add(rangeIndicator);
 }
 
 // 8. Upgrade tower function to handle frost tower upgrades
@@ -2866,10 +2449,6 @@ function updateRoundCounter() {
     document.getElementById('round-counter').textContent = `Round: ${gameState.currentRound}/${gameState.maxRounds}`;
 }
 
-function updateRoundTimer() {
-    document.getElementById('round-timer').textContent = `Next round in: ${gameState.interRoundTimer}s`;
-}
-
 // Show game over screen
 function showGameOverScreen(victory) {
     const gameOverElement = document.getElementById('game-over');
@@ -2999,133 +2578,92 @@ function handleTowerOptionClick(event, towerType) {
 
 // Handle canvas click
 function handleCanvasClick(event) {
-    // Stop event from bubbling up to document
-    event.stopPropagation();
+    if (!gameState.gameActive) return;
     
-    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    // Get mouse position in normalized device coordinates (-1 to +1)
     const rect = renderer.domElement.getBoundingClientRect();
-    const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     
     // Create raycaster
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera({ x: mouseX, y: mouseY }, camera);
+    raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
     
-    // First check for tower clicks
-    const towerIntersects = raycaster.intersectObjects(scene.children, true);
+    // Check for tower slot hits
+    const towerSlotIntersects = raycaster.intersectObjects(
+        gameState.towerSlots.filter(slot => !slot.occupied).map(slot => slot.mesh)
+    );
     
-    // Find which tower was clicked by checking the entire hierarchy
-    let clickedObject = towerIntersects[0]?.object;
-    let selectedTower = null;
+    // Check for existing tower hits
+    const towerIntersects = raycaster.intersectObjects(
+        gameState.towers.map(tower => tower.mesh)
+    );
     
-    while (clickedObject && !selectedTower) {
-        // Check if this object is a tower mesh
-        for (let i = 0; i < gameState.towers.length; i++) {
-            if (gameState.towers[i].mesh === clickedObject) {
-                selectedTower = gameState.towers[i];
-                break;
-            }
-        }
-        
-        // Move up to parent if exists
-        clickedObject = clickedObject.parent;
-        // Break if we're at scene level
-        if (clickedObject === scene) break;
-    }
-    
-    if (selectedTower) {
-        // Remove any previous range indicators
+    // Clear range indicators if clicking on empty space
+    if (towerSlotIntersects.length === 0 && towerIntersects.length === 0) {
         clearAllRangeIndicators();
-        selectTower(selectedTower);
+        gameState.selectedTowerSlot = null;
+        gameState.selectedTower = null;
+        updateUI();
         return;
     }
     
-    // Then check for slot clicks
-    const slotIntersects = raycaster.intersectObjects(scene.children, true);
-    
-    for (const intersect of slotIntersects) {
-        const object = intersect.object;
-        if (object.userData && object.userData.type === 'towerSlot') {
-            const slot = gameState.towerSlots[object.userData.index];
-            if (!slot.occupied) {
-                // Clear previous indicators first
-                clearAllRangeIndicators();
+    // Handle tower slot selection
+    if (towerSlotIntersects.length > 0) {
+        const slotMesh = towerSlotIntersects[0].object;
+        const slot = gameState.towerSlots.find(s => s.mesh === slotMesh);
+        if (slot && !slot.occupied) {
                 selectTowerSlot(slot);
+        }
                 return;
             }
+    
+    // Handle tower selection
+    if (towerIntersects.length > 0) {
+        const towerMesh = towerIntersects[0].object;
+        const tower = gameState.towers.find(t => t.mesh === towerMesh);
+        if (tower) {
+            selectTower(tower);
         }
     }
-    
-    // If we didn't hit anything important, clear all selections and indicators
-    clearAllRangeIndicators();
 }
 
 
 // Also modify the selectTowerSlot function to call setupTowerSelectionListeners
 function selectTowerSlot(slot) {
-    console.log("Selecting tower slot:", slot);
+    // Clear previous selections and indicators
+    clearAllRangeIndicators();
     
-    // If there was a previously selected tower, remove its range indicator
-    if (gameState.selectedTower && gameState.selectedTower.rangeIndicator) {
-        scene.remove(gameState.selectedTower.rangeIndicator);
-        gameState.selectedTower.rangeIndicator = null;
-    }
-    
+    // Update selected slot
     gameState.selectedTowerSlot = slot;
+    gameState.selectedTower = null;
     
-    // Create and show range indicator for potential tower
-    const rangeIndicator = createRangeIndicator(
-        {x: slot.x, y: slot.y, z: slot.z}, 
-        8 // Default tower range
-    );
-    gameState.towerSlotRangeIndicator = rangeIndicator;
-    scene.add(rangeIndicator);
+    // Show tower selection modal
+    const towerSelection = document.getElementById('tower-selection');
+    const towerSelectionBackdrop = document.getElementById('tower-selection-backdrop');
     
-    // Hide tower actions
-    document.getElementById('tower-actions').classList.add('hidden');
-    
-    // Show backdrop and tower selection menu
-    document.getElementById('tower-selection-backdrop').classList.remove('hidden');
-    document.getElementById('tower-selection').classList.remove('hidden');
-    
-    // Update tower options based on available gold
-    updateTowerOptionsAvailability();
-    
-    // Setup tower selection listeners
-    setupTowerSelectionListeners();
-
-    // Remove any existing click handler
-    if (gameState.modalCloseHandler) {
-        document.getElementById('tower-selection-backdrop').removeEventListener('click', gameState.modalCloseHandler);
-    }
-
-    // Create new click handler for the backdrop
-    gameState.modalCloseHandler = function(event) {
-        // Only handle clicks directly on the backdrop
-        if (event.target === document.getElementById('tower-selection-backdrop')) {
-            // Clear range indicator
-            if (gameState.towerSlotRangeIndicator) {
-                scene.remove(gameState.towerSlotRangeIndicator);
-                gameState.towerSlotRangeIndicator = null;
-            }
-            
-            // Hide menus
-            document.getElementById('tower-selection-backdrop').classList.add('hidden');
-            document.getElementById('tower-selection').classList.add('hidden');
-            document.getElementById('tower-actions').classList.add('hidden');
-            
-            // Reset selection
+    if (towerSelection && towerSelectionBackdrop) {
+        towerSelection.classList.remove('hidden');
+        towerSelectionBackdrop.classList.remove('hidden');
+        
+        // Add click handler to backdrop for closing
+        towerSelectionBackdrop.onclick = function(event) {
+            if (event.target === towerSelectionBackdrop) {
+                // Hide modals
+                towerSelection.classList.add('hidden');
+                towerSelectionBackdrop.classList.add('hidden');
+                
+                // Clear selection and range indicator
             gameState.selectedTowerSlot = null;
-            gameState.selectedTower = null;
-            
-            // Remove the click handler
-            document.getElementById('tower-selection-backdrop').removeEventListener('click', gameState.modalCloseHandler);
-            gameState.modalCloseHandler = null;
-        }
-    };
+                clearAllRangeIndicators();
+            }
+        };
+    }
     
-    // Add click handler to the backdrop
-    document.getElementById('tower-selection-backdrop').addEventListener('click', gameState.modalCloseHandler);
+    // Create range indicator for the slot
+    const rangeIndicator = createRangeIndicator(slot.position, 8); // Default range of 8
+    rangeIndicator.userData.type = 'rangeIndicator';
+    scene.add(rangeIndicator);
 }
 
 // Handle window resize
@@ -3162,17 +2700,12 @@ if (!gameState.paths) {
 
 // Clear all range indicators
 function clearAllRangeIndicators() {
-    // Clear tower range indicators
-    if (gameState.selectedTower && gameState.selectedTower.rangeIndicator) {
-        scene.remove(gameState.selectedTower.rangeIndicator);
-        gameState.selectedTower.rangeIndicator = null;
-    }
-    
-    // Clear slot range indicator
-    if (gameState.towerSlotRangeIndicator) {
-        scene.remove(gameState.towerSlotRangeIndicator);
-        gameState.towerSlotRangeIndicator = null;
-    }
+    // Remove all range indicators from the scene
+    scene.children.forEach(child => {
+        if (child.userData && child.userData.type === 'rangeIndicator') {
+            scene.remove(child);
+        }
+    });
 }
 
 // Apply slow effect to a creep
@@ -3340,17 +2873,16 @@ function createFireCriticalEffect(position) {
     gameState.activeAnimations.push(animation);
 }
 
-// Create floating damage number
-function createFloatingDamageNumber(position, damage, isCritical = false) {
+function createDamageTexture(damage, isCritical = false) {
     // Create a canvas element for the damage number
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = 128;  // Increased size
-    canvas.height = 64;  // Increased size
+    canvas.width = 128;
+    canvas.height = 64;
     
-    // Draw the damage number with larger font and better styling
+    // Set up text style
     ctx.fillStyle = isCritical ? '#ff0000' : '#ffffff';
-    ctx.font = 'bold 48px Arial';  // Increased font size
+    ctx.font = 'bold 48px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
@@ -3360,98 +2892,122 @@ function createFloatingDamageNumber(position, damage, isCritical = false) {
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     
-    ctx.fillText(damage.toString(), 64, 32);
+    // Draw the damage number
+    ctx.fillText(Math.round(damage).toString(), canvas.width / 2, canvas.height / 2);
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ 
-        map: texture,
-        transparent: true,
-        depthTest: false  // Ensure it's always visible
-    });
-    const sprite = new THREE.Sprite(spriteMaterial);
+    texture.needsUpdate = true;
+    
+    return texture;
+}
+
+function createFloatingDamageNumber(position, damage, isCritical = false) {
+    const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+            map: createDamageTexture(damage, isCritical),
+            transparent: true,
+            opacity: 1,
+            depthTest: false // Ensure it's always visible
+        })
+    );
     
     // Set initial position and scale
-    sprite.position.set(position.x, position.y + 1, position.z);
-    sprite.scale.set(2, 1, 1);  // Increased scale
+    sprite.position.copy(position);
+    sprite.position.y += 1; // Start above the target
+    sprite.scale.set(2, 1, 1); // Make the sprite wider for better readability
     
-    // Add to scene
     scene.add(sprite);
     
-    // Create animation
-    let time = 0;
+    const startTime = Date.now();
+    const duration = 1000; // Animation duration in ms
+    const startY = sprite.position.y;
+    
     const animation = function(delta) {
-        time += delta;
+        const elapsed = Date.now() - startTime;
+        const progress = elapsed / duration;
         
-        // Initial pop-up effect
-        const popUpProgress = Math.min(1, time * 5);  // Faster initial pop
-        const popUpScale = 1 + (1 - popUpProgress) * 0.5;  // Start larger and shrink to normal size
-        
-        // Float upward with easing
-        const floatProgress = Math.min(1, time * 2);  // Slower float
-        const floatHeight = floatProgress * 2;  // Float up 2 units
-        
-        // Fade out
-        const fadeProgress = Math.max(0, 1 - (time - 0.5));  // Start fading after 0.5s
-        
-        // Apply transformations
-        sprite.scale.set(2 * popUpScale, popUpScale, 1);
-        sprite.position.y = position.y + 1 + floatHeight;
-        sprite.material.opacity = fadeProgress;
-        
-        // Remove when done
-        if (time >= 1) {
+        if (progress >= 1) {
             scene.remove(sprite);
-            return false;
+            sprite.material.dispose();
+            sprite.material.map.dispose();
+            return true; // Animation complete
         }
         
-        return true;
+        // Pop-up and fade effect
+        const scaleProgress = Math.min(1, progress * 2); // Faster scale animation
+        const fadeProgress = Math.max(0, 1 - (progress * 1.5)); // Start fading earlier
+        
+        // Move upward with easing
+        sprite.position.y = startY + (progress * 1.5); // Float up 1.5 units
+        
+        // Scale effect
+        const scale = 1 + (0.5 * (1 - scaleProgress)); // Start 50% larger and shrink to normal
+        sprite.scale.set(2 * scale, scale, 1);
+        
+        // Fade out
+        sprite.material.opacity = fadeProgress;
+        
+        return false; // Continue animation
     };
     
     // Add to active animations
-    if (!gameState.activeAnimations) {
-        gameState.activeAnimations = [];
-    }
+    if (!gameState.activeAnimations) gameState.activeAnimations = [];
     gameState.activeAnimations.push(animation);
 }
 
 // Function to show augment selection modal
 function showAugmentSelection() {
-    const modal = document.getElementById('augment-modal');
-    const options = modal.querySelectorAll('.augment-option');
+    const augmentModal = document.getElementById('augment-modal');
+    if (!augmentModal) return;
     
-    // Hide all options first
-    options.forEach(option => option.style.display = 'none');
+    // Get available augments
+    const availableAugments = window.augmentConfig.available || [];
     
-    // Get 3 random augments that aren't already active
-    const availableAugments = gameState.availableAugments.filter(
-        augment => !gameState.activeAugments.includes(augment.id)
-    );
+    // Filter out already active augments
+    const activeAugmentIds = gameState.activeAugments.map(a => a.id);
+    const availableAugmentChoices = availableAugments.filter(augment => !activeAugmentIds.includes(augment.id));
     
-    // Randomly select 3 augments
+    // Randomly select exactly 3 augments
     const selectedAugments = [];
-    for (let i = 0; i < 3 && availableAugments.length > 0; i++) {
-        const randomIndex = Math.floor(Math.random() * availableAugments.length);
-        selectedAugments.push(availableAugments.splice(randomIndex, 1)[0]);
+    const tempChoices = [...availableAugmentChoices];
+    while (selectedAugments.length < 3 && tempChoices.length > 0) {
+        const randomIndex = Math.floor(Math.random() * tempChoices.length);
+        const augment = tempChoices.splice(randomIndex, 1)[0];
+        selectedAugments.push(augment);
     }
     
-    // Show only the selected augments
+    // Get the augment options container
+    const augmentOptions = augmentModal.querySelector('.augment-options');
+    if (!augmentOptions) return;
+    
+    // Clear existing options
+    augmentOptions.innerHTML = '';
+    
+    // Create only the randomly selected augment options
     selectedAugments.forEach(augment => {
-        const option = modal.querySelector(`[data-augment="${augment.id}"]`);
-        if (option) {
-            option.style.display = 'flex';
-            option.onclick = () => selectAugment(augment);
-        }
+        const option = document.createElement('div');
+        option.className = 'augment-option';
+        option.innerHTML = `
+            <div class="augment-icon ${augment.icon}"></div>
+            <div class="augment-info">
+                <div class="augment-name">${augment.name}</div>
+                <div class="augment-description">${augment.description}</div>
+            </div>
+        `;
+        option.onclick = () => selectAugment(augment);
+        augmentOptions.appendChild(option);
     });
     
-    // Show the modal
-    modal.classList.remove('hidden');
+    // Show augment selection
+    augmentModal.classList.remove('hidden');
+    gameState.isPaused = true;
 }
 
 // Function to handle augment selection
 function selectAugment(augment) {
     // Add augment to active augments
-    gameState.activeAugments.push(augment.id);
+    gameState.activeAugments.push(augment);
     
     // Apply the augment effect
     if (augment.id === 'golden-towers') {
@@ -3460,17 +3016,20 @@ function selectAugment(augment) {
         gameState.towers.forEach(tower => augment.effect(tower));
     }
     
+    // Hide the augment selection
+    const augmentModal = document.getElementById('augment-modal');
+    if (augmentModal) {
+        augmentModal.classList.add('hidden');
+    }
+    
     // Update the augment tracker
     updateAugmentTracker();
-    
-    // Hide the modal
-    document.getElementById('augment-modal').classList.add('hidden');
     
     // Unpause the game
     gameState.isPaused = false;
     
-    // Start the inter-round timer
-    startInterRoundTimer();
+    // Dispatch the augmentSelected event
+    document.dispatchEvent(new Event('augmentSelected'));
 }
 
 // Function to reset round-specific augments
@@ -3489,43 +3048,24 @@ function resetRoundAugments() {
 // Function to update the augment tracker UI
 function updateAugmentTracker() {
     const augmentList = document.getElementById('augment-list');
+    if (!augmentList) return;
+    
     augmentList.innerHTML = ''; // Clear existing augments
     
-    // Get all active augments
-    gameState.activeAugments.forEach(augmentId => {
-        const augment = gameState.availableAugments.find(a => a.id === augmentId);
-        if (augment) {
-            // Create augment item element
-            const augmentItem = document.createElement('div');
-            augmentItem.className = 'augment-item';
-            
-            // Create icon element
-            const icon = document.createElement('div');
-            icon.className = `augment-icon-small ${augmentId}-icon`;
-            
-            // Create info container
-            const info = document.createElement('div');
-            info.className = 'augment-info-small';
-            
-            // Create name element
-            const name = document.createElement('div');
-            name.className = 'augment-name-small';
-            name.textContent = augment.name;
-            
-            // Create description element
-            const description = document.createElement('div');
-            description.className = 'augment-description-small';
-            description.textContent = augment.description;
-            
-            // Assemble the elements
-            info.appendChild(name);
-            info.appendChild(description);
-            augmentItem.appendChild(icon);
-            augmentItem.appendChild(info);
-            
-            // Add to the list
-            augmentList.appendChild(augmentItem);
-        }
+    // Add each active augment to the tracker
+    gameState.activeAugments.forEach(augment => {
+        const augmentItem = document.createElement('div');
+        augmentItem.className = 'augment-item';
+        
+        augmentItem.innerHTML = `
+            <div class="augment-icon-small ${augment.icon}"></div>
+            <div class="augment-info-small">
+                <div class="augment-name-small">${augment.name}</div>
+                <div class="augment-description-small">${augment.description}</div>
+            </div>
+        `;
+        
+        augmentList.appendChild(augmentItem);
     });
 }
 
@@ -3664,71 +3204,72 @@ function createWorkerCamp() {
     ];
 
     rockPositions.forEach(pos => {
-        createRock(pos.x, pos.z);
+        const rock = createRock(pos.x, pos.z);
+        rock.userData.type = 'mining-rock';
+        rock.userData.isOccupied = false;
     });
+
+    // Update buy button state
+    updateBuyWorkerButton();
+}
+
+function updateBuyWorkerButton() {
+    const buyWorkerBtn = document.getElementById('buy-worker');
+    if (!buyWorkerBtn) return;
+    
+    const workerCost = window.workerConfig.base.cost;
+    const canAfford = gameState.gold >= workerCost;
+    const maxWorkers = window.workerConfig.base.maxWorkers;
+    const canBuyMore = gameState.workers.length < maxWorkers;
+    
+    buyWorkerBtn.disabled = !canAfford || !canBuyMore;
+    buyWorkerBtn.style.backgroundColor = (canAfford && canBuyMore) ? '#4CAF50' : '#cccccc';
+    buyWorkerBtn.style.cursor = (canAfford && canBuyMore) ? 'pointer' : 'not-allowed';
 }
 
 function buyWorker() {
-    if (gameState.gold >= gameState.workerCost) {
-        // Find an available rock first
-        const availableRocks = scene.children.filter(child => 
-            child.userData.type === 'mining-rock' &&
-            !gameState.workers.some(w => w.targetRock === child)
-        );
-
-        if (availableRocks.length > 0) {
-            gameState.gold -= gameState.workerCost;
+    const workerCost = window.workerConfig.base.cost;
+    const maxWorkers = window.workerConfig.base.maxWorkers;
+    
+    // Check if we can afford and have room for another worker
+    if (gameState.gold >= workerCost && gameState.workers.length < maxWorkers) {
+        // Deduct gold
+        gameState.gold -= workerCost;
             updateGold();
 
-            // Find the nearest available rock to the worker camp
-            const workerCampPosition = new THREE.Vector3(-35, 0.5, 0);
-            const nearestRock = availableRocks.reduce((nearest, rock) => {
-                const distance = getDistance3D(workerCampPosition, rock.position);
-                return distance < getDistance3D(workerCampPosition, nearest.position) ? rock : nearest;
-            }, availableRocks[0]);
-
-            // Create and position the worker
+        // Create new worker
             const worker = {
-                id: `worker-${gameState.workers.length + 1}`,
+            id: Date.now(),
                 mesh: createWorkerMesh(),
-                position: new THREE.Vector3(-35, 0.5, 0),
-                targetRock: nearestRock,
-                miningTimer: 0
-            };
-
-            // Position the worker next to their assigned rock
-            const rockPosition = nearestRock.position;
-            const workerPosition = new THREE.Vector3(
-                rockPosition.x + 1, // Offset 1 unit to the right of the rock
-                rockPosition.y + 0.5, // Keep worker at ground level
-                rockPosition.z
-            );
-            
-            worker.mesh.position.copy(workerPosition);
-            worker.position.copy(workerPosition);
-            
-            // Make the worker face the rock
-            worker.mesh.lookAt(rockPosition);
-            
-            scene.add(worker.mesh);
-            
-            // Add worker to game state
-            gameState.workers.push(worker);
+            targetRock: null,
+            miningTimer: 0,
+            miningInterval: window.workerConfig.base.miningInterval,
+            goldPerMining: window.workerConfig.base.goldPerMining
+        };
+        
+        // Position worker at camp
+        const campPosition = window.workerConfig.camp.position;
+        worker.mesh.position.set(campPosition.x, 0, campPosition.z);
+        
+        // Add to scene and game state
+        scene.add(worker.mesh);
+        gameState.workers.push(worker);
+        
+        // Find an available rock
+        const availableRocks = scene.children.filter(child => 
+            child.userData.type === 'mining-rock' && !child.userData.isOccupied
+        );
+        
+        if (availableRocks.length > 0) {
+            const targetRock = availableRocks[0];
+            targetRock.userData.isOccupied = true;
+            worker.targetRock = targetRock;
+            worker.mesh.position.copy(targetRock.position);
+        }
+        
+        // Update UI
             updateWorkerList();
             updateBuyWorkerButton();
-        } else {
-            // Show a message that all mining spots are occupied
-            const workerList = document.getElementById('worker-list');
-            const message = document.createElement('div');
-            message.className = 'worker-message';
-            message.textContent = 'All mining spots are occupied!';
-            workerList.appendChild(message);
-            
-            // Remove the message after 3 seconds
-            setTimeout(() => {
-                message.remove();
-            }, 3000);
-        }
     }
 }
 
@@ -3783,20 +3324,50 @@ function updateWorkerList() {
     });
 }
 
-function updateBuyWorkerButton() {
-    const buyWorkerBtn = document.getElementById('buy-worker');
+function createForestEnvironment() {
+    // Empty function - we don't want trees or rocks anymore
+}
+
+function createTree(x, z) {
+    const treeGroup = new THREE.Group();
     
-    // Update button text to show cost
-    buyWorkerBtn.textContent = `Buy Worker (${gameState.workerCost} Gold)`;
+    // Create trunk
+    const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.4, 2, 8);
+    const trunkMaterial = new THREE.MeshPhongMaterial({ color: 0x4a2f10 });
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunk.position.y = 1;
+    treeGroup.add(trunk);
     
-    // Check if there are available rocks
-    const availableRocks = scene.children.filter(child => 
-        child.userData.type === 'mining-rock' &&
-        !gameState.workers.some(w => w.targetRock === child)
-    );
+    // Create leaves
+    const leavesGeometry = new THREE.ConeGeometry(1.5, 3, 8);
+    const leavesMaterial = new THREE.MeshPhongMaterial({ color: 0x2d5a27 });
+    const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+    leaves.position.y = 2.5;
+    treeGroup.add(leaves);
     
-    // Disable button if either condition is true:
-    // 1. Not enough gold
-    // 2. No available mining spots
-    buyWorkerBtn.disabled = gameState.gold < gameState.workerCost || availableRocks.length === 0;
+    // Position the tree
+    treeGroup.position.set(x, 0, z);
+    
+    // Add to scene
+    scene.add(treeGroup);
+}
+
+function createTowerSlotMesh() {
+    // Create visual representation of the slot
+    const slotGeometry = new THREE.BoxGeometry(1.5, 0.2, 1.5);
+    const slotMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x8b4513,
+        transparent: true,
+        opacity: 0.8
+    });
+    
+    const slotMesh = new THREE.Mesh(slotGeometry, slotMaterial);
+    slotMesh.receiveShadow = true;
+    
+    // Make the slot interactive
+    slotMesh.userData = {
+        type: 'towerSlot'
+    };
+    
+    return slotMesh;
 }
