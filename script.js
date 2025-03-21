@@ -38,21 +38,30 @@ window.buildTower = function(towerType) {
                 name: "Basic Tower",
                 ranks: [
                     { cost: 3, damage: 25, attackSpeed: 2, color: 0xaaaaaa },
-                    { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd }
+                    { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd },
+                    { cost: 8, damage: 60, attackSpeed: 1.2, color: 0xffffff },
+                    { cost: 12, damage: 85, attackSpeed: 1.0, color: 0xffffff },
+                    { cost: 15, damage: 120, attackSpeed: 0.8, color: 0xffffff }
                 ]
             },
             frost: {
                 name: "Frost Tower",
                 ranks: [
                     { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
-                    { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
+                    { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.4, color: 0x1E90FF },
+                    { cost: 12, damage: 40, attackSpeed: 1.0, slowEffect: 0.5, color: 0x0000CD },
+                    { cost: 15, damage: 60, attackSpeed: 0.8, slowEffect: 0.6, color: 0x0000CD },
+                    { cost: 20, damage: 85, attackSpeed: 0.6, slowEffect: 0.7, color: 0x0000CD }
                 ]
             },
             fire: {
                 name: "Fire Tower",
                 ranks: [
-                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.5, critMultiplier: 1.75, color: 0xff4500 },
-                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.5, critMultiplier: 1.75, color: 0xff0000 }
+                    { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.4, critMultiplier: 1.5, color: 0xff4500 },
+                    { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.45, critMultiplier: 1.6, color: 0xff0000 },
+                    { cost: 15, damage: 55, attackSpeed: 1.2, critChance: 0.5, critMultiplier: 1.7, color: 0xff0000 },
+                    { cost: 20, damage: 80, attackSpeed: 1.0, critChance: 0.55, critMultiplier: 1.8, color: 0xff0000 },
+                    { cost: 25, damage: 110, attackSpeed: 0.8, critChance: 0.6, critMultiplier: 2.0, color: 0xff0000 }
                 ]
             }
         };
@@ -220,21 +229,30 @@ let gameState = {
             name: "Basic Tower",
             ranks: [
                 { cost: 3, damage: 25, attackSpeed: 2, color: 0xaaaaaa },
-                { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd }
+                { cost: 5, damage: 40, attackSpeed: 1.5, color: 0xdddddd },
+                { cost: 8, damage: 60, attackSpeed: 1.2, color: 0xffffff },
+                { cost: 12, damage: 85, attackSpeed: 1.0, color: 0xffffff },
+                { cost: 15, damage: 120, attackSpeed: 0.8, color: 0xffffff }
             ]
         },
         frost: {
             name: "Frost Tower",
             ranks: [
-                { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.5, color: 0x6495ED },
-                { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.5, color: 0x1E90FF }
+                { cost: 5, damage: 15, attackSpeed: 1.5, slowEffect: 0.3, color: 0x6495ED },
+                { cost: 8, damage: 25, attackSpeed: 1.2, slowEffect: 0.4, color: 0x1E90FF },
+                { cost: 12, damage: 40, attackSpeed: 1.0, slowEffect: 0.5, color: 0x0000CD },
+                { cost: 15, damage: 60, attackSpeed: 0.8, slowEffect: 0.6, color: 0x0000CD },
+                { cost: 20, damage: 85, attackSpeed: 0.6, slowEffect: 0.7, color: 0x0000CD }
             ]
         },
         fire: {
             name: "Fire Tower",
             ranks: [
                 { cost: 7, damage: 20, attackSpeed: 1.8, critChance: 0.4, critMultiplier: 1.5, color: 0xff4500 },
-                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.4, critMultiplier: 1.5, color: 0xff0000 }
+                { cost: 10, damage: 35, attackSpeed: 1.4, critChance: 0.45, critMultiplier: 1.6, color: 0xff0000 },
+                { cost: 15, damage: 55, attackSpeed: 1.2, critChance: 0.5, critMultiplier: 1.7, color: 0xff0000 },
+                { cost: 20, damage: 80, attackSpeed: 1.0, critChance: 0.55, critMultiplier: 1.8, color: 0xff0000 },
+                { cost: 25, damage: 110, attackSpeed: 0.8, critChance: 0.6, critMultiplier: 2.0, color: 0xff0000 }
             ]
         }
     },
@@ -292,7 +310,7 @@ let gameState = {
     workers: [],
     workerCost: 4,
     goldPerWorker: 1,
-    workerMiningInterval: 7, // seconds
+    workerMiningInterval: 8, // seconds
     workerMiningTimers: {}
 };
 
@@ -1514,7 +1532,7 @@ function spawnCreep() {
         
         // Only apply difficulty scaling if we're past round 1
         if (gameState.currentRound > 1) {
-            const difficultyMultiplier = Math.pow(1.25, gameState.currentRound - 1);
+            const difficultyMultiplier = Math.pow(1.5, gameState.currentRound - 1);
             health = Math.round(health * difficultyMultiplier);
         }
         
@@ -2791,7 +2809,7 @@ function selectTower(tower) {
     
     // Update upgrade button
     const upgradeButton = document.getElementById('upgrade-tower');
-    if (tower.rank < 2) {
+    if (tower.rank < 5) {
         const upgradeCost = towerType.ranks[tower.rank].cost;
         upgradeButton.textContent = `Upgrade (${upgradeCost} Gold)`;
         
@@ -2803,7 +2821,7 @@ function selectTower(tower) {
             upgradeButton.style.opacity = '1';
         }
     } else {
-        upgradeButton.textContent = 'Max Rank';
+        upgradeButton.textContent = `Rank ${tower.rank}/5`;
         upgradeButton.disabled = true;
         upgradeButton.style.opacity = '0.5';
     }
@@ -2821,7 +2839,7 @@ function upgradeTower() {
     const towerType = gameState.towerTypes[tower.type];
     
     // Check tower rank
-    if (tower.rank >= 2) return;
+    if (tower.rank >= 5) return;
     
     // Get upgrade cost
     const upgradeCost = towerType.ranks[tower.rank].cost;
@@ -2838,6 +2856,9 @@ function upgradeTower() {
     // Update special properties for specific tower types
     if (tower.type === 'frost') {
         tower.slowEffect = newRankData.slowEffect;
+    } else if (tower.type === 'fire') {
+        tower.critChance = newRankData.critChance;
+        tower.critMultiplier = newRankData.critMultiplier;
     }
     
     // Update visual appearance
