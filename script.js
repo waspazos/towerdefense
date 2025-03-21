@@ -170,7 +170,7 @@ function initGame() {
         
         // Start the first round with a delay to allow for scene setup
         setTimeout(() => {
-            startRound();
+            startInterRoundTimer(); // Start with inter-round timer instead of round
         }, 1000);
     }
     
@@ -1243,20 +1243,52 @@ function spawnCreepOnPath(pathIndex) {
         health: creepTypeDef.baseStats.health,
         maxHealth: creepTypeDef.baseStats.health,
         speed: creepTypeDef.baseStats.speed,
+        baseSpeed: creepTypeDef.baseStats.speed,
         goldValue: creepTypeDef.baseStats.goldValue,
         damageToKing: creepTypeDef.baseStats.damageToKing,
         pathIndex: pathIndex,
         currentWaypointIndex: 0,
-        position: position.clone(), // Initialize position as Vector3
+        position: position.clone(),
         mesh: createCreepMesh(roundDef.type),
         effects: {
             slow: null,
             burn: null
-        }
+        },
+        slowEffects: []
     };
     
     // Set mesh position to match creep position
     creep.mesh.position.copy(position);
+    
+    // Create health bar
+    const healthBarWidth = 1;
+    const healthBarHeight = 0.1;
+    const healthBarGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+    const healthBarMaterial = new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        side: THREE.DoubleSide
+    });
+    const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+    
+    // Position health bar above creep
+    healthBar.position.y = 1.2;
+    healthBar.rotation.x = Math.PI / 2;
+    
+    // Create black background for health bar
+    const healthBarBgGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+    const healthBarBgMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        side: THREE.DoubleSide
+    });
+    const healthBarBg = new THREE.Mesh(healthBarBgGeometry, healthBarBgMaterial);
+    healthBarBg.position.y = 1.2;
+    healthBarBg.rotation.x = Math.PI / 2;
+    
+    // Add health bars to creep mesh
+    creep.mesh.add(healthBarBg);
+    creep.mesh.add(healthBar);
+    creep.healthBar = healthBar;
+    creep.healthBarBg = healthBarBg;
     
     // Add to scene and game state
     scene.add(creep.mesh);
@@ -1684,10 +1716,19 @@ function pauseGame() {
     gameState.isPaused = true;
     gameState.pauseStartTime = Date.now();
     
-    // Pause all timers
-    if (gameState.roundTimer) clearInterval(gameState.roundTimer);
-    if (gameState.spawnTimer) clearInterval(gameState.spawnTimer);
-    if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+    // Clear all timers
+    if (gameState.roundTimer) {
+        clearInterval(gameState.roundTimer);
+        gameState.roundTimer = null;
+    }
+    if (gameState.spawnTimer) {
+        clearInterval(gameState.spawnTimer);
+        gameState.spawnTimer = null;
+    }
+    if (gameState.timerInterval) {
+        clearInterval(gameState.timerInterval);
+        gameState.timerInterval = null;
+    }
     
     // Show pause menu and backdrop
     const pauseMenu = document.getElementById('esc-menu');
@@ -1739,6 +1780,26 @@ function resumeGame() {
                 endRound();
             }
         }, 1000);
+        
+        // Restart creep spawning if not finished
+        const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+        const spawnPattern = window.roundConfig.spawnPatterns[roundDef.type];
+        if (gameState.creepsSpawned < spawnPattern.totalCreeps) {
+            gameState.spawnTimer = setInterval(() => {
+                if (!gameState.isPaused) {
+                    if (gameState.creepsSpawned < spawnPattern.totalCreeps) {
+                        const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+                        spawnCreepOnPath(pathIndex);
+                        gameState.creepsSpawned++;
+                        console.log(`Spawned creep ${gameState.creepsSpawned}/${spawnPattern.totalCreeps} on path ${pathIndex}`);
+                    } else {
+                        clearInterval(gameState.spawnTimer);
+                        gameState.spawnTimer = null;
+                        console.log('Finished spawning all creeps for this round');
+                    }
+                }
+            }, spawnPattern.spawnInterval * 1000);
+        }
     } else if (!gameState.roundActive) {
         // Restart inter-round timer
         startInterRoundTimer();
@@ -2066,28 +2127,25 @@ function startRound() {
         return;
     }
     
-    // Start with inter-round timer
-    gameState.interRoundTimer = 10;
-    updateRoundTimer();
+    // Get current round definition
+    const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
+    if (!roundDef) {
+        console.error('Invalid round definition for round:', gameState.currentRound);
+        return;
+    }
     
-    // Set up timer to start the round after delay
-    const timerInterval = setInterval(() => {
-        if (gameState.isPaused) return;
-        
-        gameState.interRoundTimer--;
-        updateRoundTimer();
-        
-        if (gameState.interRoundTimer <= 0) {
-            clearInterval(timerInterval);
-            startRoundSpawning();
-        }
-    }, 1000);
+    console.log(`Starting round ${gameState.currentRound}`);
     
-    gameState.timerInterval = timerInterval;
+    // Update UI
+    updateRoundCounter();
+    updateRoundTracker();
+    
+    // Start spawning creeps immediately
+    startRoundSpawning();
 }
 
 function startRoundSpawning() {
-    console.log('Starting round:', gameState.currentRound);
+    console.log('Starting round spawning:', gameState.currentRound);
     
     // Get current round definition
     const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
@@ -2119,33 +2177,41 @@ function startRoundSpawning() {
     if (gameState.roundTimer) clearInterval(gameState.roundTimer);
     if (gameState.spawnTimer) clearInterval(gameState.spawnTimer);
     
-    console.log(`Round ${gameState.currentRound} configuration:`, {
-        type: roundDef.type,
-        creepsToSpawn: spawnPattern.totalCreeps,
-        spawnInterval: spawnPattern.spawnInterval,
-        duration: roundDef.duration
-    });
-    
-    // Spawn first creep
-    const pathIndex = Math.floor(Math.random() * gameState.paths.length);
-    spawnCreepOnPath(pathIndex);
-    gameState.creepsSpawned++;
-    console.log(`Spawned first creep on path ${pathIndex}`);
-    
-    // Set up spawn timer for remaining creeps
-    gameState.spawnTimer = setInterval(() => {
+    // Set up round timer to check for round completion
+    gameState.roundTimer = setInterval(() => {
         if (!gameState.isPaused) {
-            if (gameState.creepsSpawned < spawnPattern.totalCreeps) {
-                const pathIndex = Math.floor(Math.random() * gameState.paths.length);
-                spawnCreepOnPath(pathIndex);
-                gameState.creepsSpawned++;
-                console.log(`Spawned creep ${gameState.creepsSpawned}/${spawnPattern.totalCreeps} on path ${pathIndex}`);
-            } else {
-                clearInterval(gameState.spawnTimer);
-                console.log('Finished spawning all creeps for this round');
+            // Check if all creeps are dead or have reached the end
+            if (gameState.creepsSpawned >= spawnPattern.totalCreeps && gameState.creeps.length === 0) {
+                console.log('All creeps dead or reached end, ending round');
+                endRound();
             }
         }
-    }, spawnPattern.spawnInterval * 1000);
+    }, 500); // Check more frequently
+    
+    // Only spawn first creep and start timer if not paused
+    if (!gameState.isPaused) {
+        // Spawn first creep
+        const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+        spawnCreepOnPath(pathIndex);
+        gameState.creepsSpawned++;
+        console.log(`Spawned first creep on path ${pathIndex}`);
+        
+        // Set up spawn timer for remaining creeps
+        gameState.spawnTimer = setInterval(() => {
+            if (!gameState.isPaused) {
+                if (gameState.creepsSpawned < spawnPattern.totalCreeps) {
+                    const pathIndex = Math.floor(Math.random() * gameState.paths.length);
+                    spawnCreepOnPath(pathIndex);
+                    gameState.creepsSpawned++;
+                    console.log(`Spawned creep ${gameState.creepsSpawned}/${spawnPattern.totalCreeps} on path ${pathIndex}`);
+                } else {
+                    clearInterval(gameState.spawnTimer);
+                    gameState.spawnTimer = null;
+                    console.log('Finished spawning all creeps for this round');
+                }
+            }
+        }, spawnPattern.spawnInterval * 1000);
+    }
 }
 
 function updateRoundTimer() {
@@ -2162,8 +2228,8 @@ function updateRoundTimer() {
         const timer = Math.max(0, Math.floor(gameState.interRoundTimer));
         timerElement.textContent = `Next round in: ${timer}s`;
     } else {
-        // Show current round number
-        timerElement.textContent = `Round: ${gameState.currentRound}/${window.roundConfig.maxRounds}`;
+        // Show round progress instead of round number
+        timerElement.textContent = 'Round in progress';
     }
 }
 
@@ -2184,10 +2250,17 @@ function endRound() {
     
     // Check if round was successful
     const roundDef = window.roundConfig.rounds[gameState.currentRound - 1];
-    const success = gameState.creepsReachedEnd < roundDef.maxCreepsReached;
+    if (!roundDef) {
+        console.error('Invalid round definition for round:', gameState.currentRound);
+        return;
+    }
+    
+    // A round is successful if there are no creeps left and king is alive
+    const success = gameState.creeps.length === 0 && gameState.kingHealth > 0;
     
     if (success) {
         // Round completed successfully
+        console.log('Round completed successfully');
         gameState.currentRound++;
         gameState.roundsCompleted++;
         
@@ -2197,31 +2270,30 @@ function endRound() {
             return;
         }
         
-        // Start inter-round timer
-        startInterRoundTimer();
-    } else {
-        // Round failed
+        // Reset round state
+        gameState.roundActive = false;
+        gameState.roundStartTime = null;
+        gameState.creepsSpawned = 0;
+        gameState.creepsKilled = 0;
+        gameState.creepsReachedEnd = 0;
+        
+        // Clear all projectiles
+        gameState.projectiles.forEach(projectile => {
+            scene.remove(projectile.mesh);
+        });
+        gameState.projectiles = [];
+        
+        // Start inter-round timer with a small delay to ensure clean state
+        setTimeout(() => {
+            startInterRoundTimer();
+            // Update UI
+            updateRoundCounter();
+            updateRoundTracker();
+        }, 100);
+    } else if (gameState.kingHealth <= 0) {
+        // Game over - king died
         showGameOverScreen(false);
     }
-    
-    // Reset round state
-    gameState.roundActive = false;
-    gameState.roundStartTime = null;
-    gameState.creepsSpawned = 0;
-    gameState.creepsKilled = 0;
-    gameState.creepsReachedEnd = 0;
-    
-    // Clear all creeps
-    gameState.creeps.forEach(creep => {
-        scene.remove(creep.mesh);
-    });
-    gameState.creeps = [];
-    
-    // Clear all projectiles
-    gameState.projectiles.forEach(projectile => {
-        scene.remove(projectile.mesh);
-    });
-    gameState.projectiles = [];
     
     console.log(`Round ${gameState.currentRound - 1} ended. Success: ${success}`);
 }
@@ -2236,7 +2308,7 @@ function startInterRoundTimer() {
     }
     
     // Reset timer to 10 seconds
-    gameState.interRoundTimer = 10;
+    gameState.interRoundTimer = window.roundConfig.interRoundTimer;
     updateRoundTimer();
     
     // Start countdown timer
@@ -2445,8 +2517,7 @@ function updateTotalDamage() {
 }
 
 function updateRoundCounter() {
-    // Show the actual round number (no need to add 1 since we increment at start of startRound)
-    document.getElementById('round-counter').textContent = `Round: ${gameState.currentRound}/${gameState.maxRounds}`;
+    document.getElementById('round-counter').textContent = `${gameState.currentRound}/${gameState.maxRounds}`;
 }
 
 // Show game over screen
