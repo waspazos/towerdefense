@@ -4,12 +4,12 @@
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>3D Tower Defense</title>
-   <link rel="stylesheet" href="style.css">
+   <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
    <div id="game-container">
        <div id="canvas-container"></div>
-       
+
        <div id="game-ui">
            <div id="game-stats">
                <div class="stat-item">
@@ -29,7 +29,7 @@
                    <span id="total-damage">0</span>
                </div>
            </div>
-           
+
            <div id="round-info">
                <div id="round-counter">Round: 1/20</div>
                <div id="round-timer">Next round in: 10s</div>
@@ -43,11 +43,11 @@
            </div>
            <button id="buy-worker" class="buy-worker-btn">Buy Worker (3 Gold)</button>
        </div>
-       
+
        <div id="tower-selection-backdrop" class="hidden"></div>
        <div id="tower-selection" class="hidden">
            <div class="tower-options">
-               <div class="tower-option" data-type="basic" onclick="handleTowerOptionClick(event, 'basic')">
+               <div class="tower-option" data-type="basic">
                    <div class="tower-icon basic-tower"></div>
                    <div class="tower-info">
                        <div class="tower-name">Basic Tower</div>
@@ -57,7 +57,7 @@
                        <div class="tower-stat">Multi-target</div>
                    </div>
                </div>
-               <div class="tower-option" data-type="frost" onclick="handleTowerOptionClick(event, 'frost')">
+               <div class="tower-option" data-type="frost">
                    <div class="tower-icon frost-tower"></div>
                    <div class="tower-info">
                        <div class="tower-name">Frost Tower</div>
@@ -67,7 +67,7 @@
                        <div class="tower-stat">Slow: 30%</div>
                    </div>
                </div>
-               <div class="tower-option" data-type="fire" onclick="handleTowerOptionClick(event, 'fire')">
+               <div class="tower-option" data-type="fire">
                    <div class="tower-icon fire-tower"></div>
                    <div class="tower-info">
                        <div class="tower-name">Fire Tower</div>
@@ -79,7 +79,7 @@
                </div>
            </div>
        </div>
-       
+
        <div id="tower-actions" class="hidden">
            <div id="tower-details">
                <div id="tower-details-icon"></div>
@@ -96,7 +96,7 @@
                <button id="cancel-tower-action">Cancel</button>
            </div>
        </div>
-       
+
        <div id="game-over" class="modal hidden">
            <div class="modal-content">
                <h2 id="game-result-title">Game Over</h2>
@@ -158,45 +158,10 @@
            </div>
        </div>
    </div>
-   
+
    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-   
+
    <!-- Engine -->
-   <script type="module" src="engine/EventSystem.js"></script>
-   <script type="module" src="engine/Renderer.js"></script>
-   <script type="module" src="engine/InputManager.js"></script>
-   
-   <!-- Systems -->
-   <script type="module" src="systems/CombatSystem.js"></script>
-   <script type="module" src="systems/EconomySystem.js"></script>
-   <script type="module" src="systems/PathingSystem.js"></script>
-   <script type="module" src="systems/AugmentSystem.js"></script>
-   
-   <!-- States -->
-   <script type="module" src="states/GameState.js"></script>
-   <script type="module" src="states/PlayingState.js"></script>
-   <script type="module" src="states/MenuState.js"></script>
-   
-   <!-- UI -->
-   <script type="module" src="ui/UIManager.js"></script>
-   <script type="module" src="ui/HUD.js"></script>
-   
-   <!-- Config -->
-   <script type="module" src="config/towerConfig.js"></script>
-   <script type="module" src="config/creepConfig.js"></script>
-   <script type="module" src="config/roundConfig.js"></script>
-   <script type="module" src="config/augmentConfig.js"></script>
-   <script type="module" src="config/workerConfig.js"></script>
-   <script type="module" src="config/pathConfig.js"></script>
-   
-   <!-- Entities -->
-   <script type="module" src="entities/Tower.js"></script>
-   <script type="module" src="entities/Creep.js"></script>
-   <script type="module" src="entities/Projectile.js"></script>
-   <script type="module" src="entities/Worker.js"></script>
-   
-   <!-- Core -->
-   <script type="module" src="Game.js"></script>
-   <script type="module" src="main.js"></script>
+   <script type="module" src="src/main.js"></script>
 </body>
 </html>

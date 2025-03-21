@@ -1,12 +1,10 @@
-import { eventSystem } from '../engine/EventSystem';
-
 export class Entity {
     constructor(position, mesh) {
         this.position = position;
         this.mesh = mesh;
         if (mesh) {
             mesh.position.copy(position);
-            eventSystem.emit('addToScene', { object: mesh });
+            window.game.eventSystem.emit('addToScene', { object: mesh });
         }
     }
 
@@ -16,7 +14,7 @@ export class Entity {
 
     destroy() {
         if (this.mesh) {
-            eventSystem.emit('removeFromScene', { object: this.mesh });
+            window.game.eventSystem.emit('removeFromScene', { object: this.mesh });
             this.mesh = null;
         }
     }

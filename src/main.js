@@ -1,7 +1,8 @@
-import { Game } from './Game.js';
+import { Game } from "./Game.js";
 
 // Start the game when page loads
-window.addEventListener('load', () => {
-  const game = new Game();
-  game.initialize();
+window.addEventListener("load", async () => {
+  window.game = new Game();
+  window.game.setup();
+  await window.game.initialize();
 });
