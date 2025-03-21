@@ -1609,22 +1609,22 @@ function spawnCreepOnPath(pathIndex) {
         // Base values without any multipliers for round 1
         switch(creepType) {
             case 'fast':
-                health = 15;
+                health = 25;
                 damage = 2;
                 speed = 3.45;
                 break;
             case 'armored':
-                health = 35;
+                health = 40;
                 damage = 2;
                 speed = 1.725;
                 break;
             case 'swarm':
-                health = 10;
+                health = 15;
                 damage = 1;
                 speed = 2.53;
                 break;
             case 'boss':
-                health = 500; // Boss has 200 HP
+                health = 550; // Boss has 200 HP
                 damage = 5; // Boss deals more damage
                 speed = 1.5; // Boss moves slower
                 break;
