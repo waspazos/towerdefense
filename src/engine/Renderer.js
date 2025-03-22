@@ -1,4 +1,4 @@
-import {towerConfig} from "../config/towerConfig";
+import { towerConfig } from '../config/towerConfig.js';
 
 export class Renderer {
   constructor() {

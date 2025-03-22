@@ -399,23 +399,21 @@ export class UIManager {
     const container = document.getElementById('worker-list');
     if (!container) return;
 
-    // Clear previous workers
+    // Clear previous content
     container.innerHTML = '';
 
     // Get workers
     let workers = [];
     window.game.eventSystem.emit('getWorkers', { callback: (workerList) => { workers = workerList; } });
 
-    // Create worker elements
-    workers.forEach(worker => {
-      const element = document.createElement('div');
-      element.className = 'worker-item';
-      element.innerHTML = `
-        <h4>Worker ${worker.id}</h4>
-        <p>Gold per second: ${worker.goldPerSecond}</p>
-      `;
-      container.appendChild(element);
-    });
+    // Create worker count display
+    const element = document.createElement('div');
+    element.className = 'worker-count';
+    element.innerHTML = `
+      <div class="worker-icon"></div>
+      <div class="worker-count-text">x${workers.length}</div>
+    `;
+    container.appendChild(element);
   }
 
   setupGameOverScreen(data) {
