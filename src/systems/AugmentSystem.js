@@ -10,12 +10,21 @@ export class AugmentSystem {
     window.game.eventSystem.on('roundCompleted', this.handleRoundCompleted.bind(this));
     window.game.eventSystem.on('towerBuilt', this.applyAugmentsToTower.bind(this));
     window.game.eventSystem.on('selectAugment', this.selectAugment.bind(this));
+    window.game.eventSystem.on('getActiveAugments', this.handleGetActiveAugments.bind(this));
     window.game.eventSystem.on('reset', this.reset.bind(this));
   }
 
   initialize() {
+    console.log("Initializing AugmentSystem...");
+    
     // Load augments from config
     this.availableAugments = augmentConfig.available;
+    
+    if (!this.availableAugments || this.availableAugments.length === 0) {
+      console.error("No available augments found in configuration!");
+    } else {
+      console.log(`Loaded ${this.availableAugments.length} available augments`);
+    }
   }
 
   handleTowerAttacked(data) {
@@ -28,7 +37,7 @@ export class AugmentSystem {
     }
   }
 
-  handleRoundCompleted() {
+  handleRoundCompleted(data) {
     // Reset round-specific augments
     this.resetRoundAugments();
 
@@ -37,6 +46,7 @@ export class AugmentSystem {
     const nextRound = this.getCurrentRound() + 1;
 
     if (selectionRounds.includes(nextRound)) {
+      console.log(`Round ${nextRound} completed. Showing augment selection.`);
       this.showAugmentSelection();
     }
   }
@@ -49,6 +59,7 @@ export class AugmentSystem {
 
   selectAugment(data) {
     const { augment } = data;
+    console.log(`Augment selected: ${augment.name}`);
 
     // Add augment to active augments
     this.activeAugments.push(augment);
@@ -101,6 +112,7 @@ export class AugmentSystem {
 
     // Check if we have the max number of augments
     if (this.activeAugments.length >= augmentConfig.selection.maxActive || availableChoices.length === 0) {
+      console.log("Maximum augments reached or no available choices.");
       return;
     }
 
@@ -118,6 +130,13 @@ export class AugmentSystem {
     // Emit event to show augment selection UI
     window.game.eventSystem.emit('showAugmentSelection', { augments: selectedAugments });
   }
+  
+  handleGetActiveAugments(data) {
+    const { callback } = data;
+    if (callback) {
+      callback(this.activeAugments);
+    }
+  }
 
   getActiveAugments() {
     return [...this.activeAugments];
@@ -125,5 +144,6 @@ export class AugmentSystem {
 
   reset() {
     this.activeAugments = [];
+    console.log("AugmentSystem reset");
   }
 }

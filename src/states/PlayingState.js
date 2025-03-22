@@ -1,8 +1,11 @@
 import { workerConfig } from "../config/workerConfig.js";
+import { Tower } from "../entities/Tower.js";
+import { Worker } from "../entities/Worker.js";
 
 class PlayingState {
   constructor() {
     this.isActive = false;
+    this.towerSlotRangeIndicator = null;
 
     // Register event listeners
     window.game.eventSystem.on("canvasClick", this.handleCanvasClick.bind(this));
@@ -86,7 +89,7 @@ class PlayingState {
       const tower = window.game.gameState.towers.find((t) => t.mesh === towerMesh);
       if (tower) {
         window.game.eventSystem.emit("towerSelected", { tower });
-        window.game.eventSystem.emit("showUI", { type: "towerActions" });
+        window.game.eventSystem.emit("showUI", { type: "towerActions", data: { tower } });
       }
     }
   }
@@ -101,8 +104,8 @@ class PlayingState {
       return;
     }
 
-    // Get tower cost
-    const towerCost = window.towerConfig[towerType].ranks[0].cost;
+    // Get tower cost from tower config
+    const towerCost = window.game.towerConfig[towerType].ranks[0].cost;
 
     // Check if player can afford
     let canAfford = false;
@@ -114,6 +117,7 @@ class PlayingState {
     });
 
     if (!canAfford) {
+      console.log(`Cannot afford tower: ${towerType}, cost: ${towerCost}`);
       return;
     }
 
@@ -180,6 +184,7 @@ class PlayingState {
     // Check worker limit
     const maxWorkers = workerConfig.base.maxWorkers;
     if (window.game.gameState.workers.length >= maxWorkers) {
+      console.log(`Cannot hire more workers. Max limit: ${maxWorkers}`);
       return;
     }
 
@@ -196,6 +201,7 @@ class PlayingState {
     });
 
     if (!canAfford) {
+      console.log(`Cannot afford worker. Cost: ${workerCost}`);
       return;
     }
 
@@ -256,9 +262,8 @@ class PlayingState {
     const { callback } = data;
     if (callback) {
       const mesh = window.game.renderer.createTowerSlotMesh();
-      return callback(mesh);
+      callback(mesh);
     }
-    return null;
   }
 }
 

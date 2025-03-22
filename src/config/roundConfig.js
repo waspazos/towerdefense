@@ -1,6 +1,7 @@
 // Round configuration definitions
 export const roundConfig = {
-  rounds: [],
+  rounds: [], // Will be populated by initialize()
+  
   // Round types and their properties
   types: {
     fast: {
@@ -57,6 +58,26 @@ export const roundConfig = {
     { type: "boss", count: 1 },
   ],
 
+  // Spawn patterns for each round type
+  spawnPatterns: {
+    fast: {
+      totalCreeps: 10,
+      spawnInterval: 1.0,
+    },
+    armored: {
+      totalCreeps: 8,
+      spawnInterval: 2.0,
+    },
+    swarm: {
+      totalCreeps: 15,
+      spawnInterval: 0.5,
+    },
+    boss: {
+      totalCreeps: 1,
+      spawnInterval: 5.0,
+    }
+  },
+
   // Round settings
   settings: {
     maxRounds: 20,
@@ -64,4 +85,31 @@ export const roundConfig = {
     difficultyIncrease: 0.2, // 20% increase per round
     bossRounds: [4, 8, 12, 16, 20], // rounds where boss appears
   },
+  
+  // Timer between rounds
+  interRoundTimer: 10, // seconds between rounds
+  
+  // Initialize method to populate rounds array from progression data
+  initialize() {
+    // Clear the rounds array
+    this.rounds = [];
+    
+    // Populate rounds from progression data
+    this.progression.forEach((progItem, index) => {
+      // Calculate difficulty based on round number
+      const difficulty = Math.floor(index / 4) + 1;
+      
+      // Create a new round definition based on progression type
+      const roundDef = {
+        type: progItem.type,
+        count: progItem.count,
+        difficulty: difficulty
+      };
+      
+      // Add to rounds array
+      this.rounds.push(roundDef);
+    });
+    
+    console.log(`Initialized ${this.rounds.length} rounds`);
+  }
 };

@@ -5,6 +5,7 @@ export class EventSystem {
     }
   
     on(event, callback) {
+      console.log(`EventSystem: Subscribing to event "${event}"`);
       if (!this.listeners[event]) {
         this.listeners[event] = [];
       }
@@ -17,7 +18,17 @@ export class EventSystem {
     }
   
     emit(event, data) {
-      if (!this.listeners[event]) return;
-      this.listeners[event].forEach(callback => callback(data));
+      console.log(`EventSystem: Emitting event "${event}"`, data);
+      if (!this.listeners[event]) {
+        console.warn(`EventSystem: No listeners for event "${event}"`);
+        return;
+      }
+      this.listeners[event].forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`Error in event handler for "${event}":`, error);
+        }
+      });
     }
 }

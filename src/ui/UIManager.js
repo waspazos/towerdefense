@@ -3,6 +3,7 @@ import {towerConfig} from "../config/towerConfig.js";
 
 export class UIManager {
   constructor() {
+    console.log('UIManager: Initializing');
     this.elements = {
       towerSelection: document.getElementById('tower-selection'),
       towerSelectionBackdrop: document.getElementById('tower-selection-backdrop'),
@@ -14,6 +15,12 @@ export class UIManager {
       augmentTracker: document.getElementById('augment-tracker'),
       workerCamp: document.getElementById('worker-camp')
     };
+
+    // Log which UI elements were found
+    console.log('UIManager: UI elements found:', Object.entries(this.elements).reduce((acc, [key, value]) => {
+      acc[key] = !!value;
+      return acc;
+    }, {}));
 
     // Register event listeners
     window.game.eventSystem.on('showUI', this.showUI.bind(this));
@@ -29,13 +36,26 @@ export class UIManager {
     window.game.eventSystem.on('showAugmentSelection', this.showAugmentSelection.bind(this));
     window.game.eventSystem.on('augmentSelected', this.updateAugmentTracker.bind(this));
     window.game.eventSystem.on('workerHired', this.updateWorkerList.bind(this));
+    window.game.eventSystem.on('gameStarted', this.handleGameStarted.bind(this));
+  }
+
+  handleGameStarted() {
+    console.log('UIManager: Game started');
+    // Hide any game over or pause screens
+    this.hideUI({ type: 'gameOver' });
+    this.hideUI({ type: 'pauseMenu' });
+    
+    // Update all UI elements to their initial state
+    this.updateUI();
   }
 
   initialize() {
+    console.log('UIManager: Running initial UI setup');
     // Initial UI setup
     this.updateRoundTracker();
     this.updateAugmentTracker();
     this.updateWorkerList();
+    this.updateUI(); // Add this to ensure all UI elements are updated initially
   }
 
   showUI(data) {
@@ -76,6 +96,7 @@ export class UIManager {
   }
 
   updateUI() {
+    console.log('UIManager: Updating all UI elements');
     this.updateGold();
     this.updateKingHealth();
     this.updateTowerCount();
@@ -87,17 +108,25 @@ export class UIManager {
   }
 
   updateGold(data) {
+    console.log('UIManager: Updating gold display');
     const goldElement = document.getElementById('gold');
-    if (!goldElement) return;
+    if (!goldElement) {
+      console.warn('UIManager: Gold element not found');
+      return;
+    }
 
     let gold = 0;
     if (data && data.gold !== undefined) {
       gold = data.gold;
     } else {
-      window.game.eventSystem.emit('getGold', { callback: (value) => { gold = value; } });
+      window.game.eventSystem.emit('getGold', { 
+        callback: (value) => {
+          console.log('UIManager: Received gold value:', value);
+          gold = value;
+          goldElement.textContent = gold;
+        }
+      });
     }
-
-    goldElement.textContent = gold;
 
     // Update buyable states
     this.updateTowerOptionsAvailability();
@@ -105,25 +134,23 @@ export class UIManager {
   }
 
   updateKingHealth(data) {
+    console.log('UIManager: Updating king health display');
     const healthElement = document.getElementById('king-health');
-    if (!healthElement) return;
+    if (!healthElement) {
+      console.warn('UIManager: Health element not found');
+      return;
+    }
 
-    let health = 0;
-    let maxHealth = 100;
-
-    if (data) {
-      health = data.health;
-      maxHealth = data.maxHealth || 100;
+    if (data && data.health !== undefined) {
+      healthElement.textContent = `${data.health}/${data.maxHealth}`;
     } else {
       window.game.eventSystem.emit('getKingHealth', {
-        callback: (value, max) => {
-          health = value;
-          maxHealth = max || 100;
+        callback: (health) => {
+          console.log('UIManager: Received king health:', health);
+          healthElement.textContent = `${health.current}/${health.max}`;
         }
       });
     }
-
-    healthElement.textContent = Math.max(0, Math.floor(health));
   }
 
   updateTowerCount(data) {
@@ -162,24 +189,55 @@ export class UIManager {
   }
 
   updateRoundTimer(data) {
+    console.log('UIManager: Updating round timer');
     const timerElement = document.getElementById('round-timer');
-    if (!timerElement) return;
-
-    let roundActive = false;
-    window.game.eventSystem.emit('isRoundActive', { callback: (value) => { roundActive = value; } });
-
-    if (roundActive) {
-      timerElement.textContent = 'Round in progress';
-    } else {
-      let timer = 0;
-      if (data && data.timer !== undefined) {
-        timer = data.timer;
-      } else {
-        window.game.eventSystem.emit('getInterRoundTimer', { callback: (value) => { timer = value; } });
-      }
-
-      timerElement.textContent = `Next round in: ${Math.max(0, Math.floor(timer))}s`;
+    if (!timerElement) {
+      console.warn('UIManager: Timer element not found');
+      return;
     }
+
+    // Check round active status
+    window.game.eventSystem.emit('isRoundActive', { 
+      callback: (isActive) => { 
+        console.log('UIManager: Round active status:', isActive);
+        
+        if (isActive) {
+          timerElement.textContent = 'Round in progress';
+          return;
+        }
+
+        // Handle timer value
+        const updateTimerDisplay = (timerValue) => {
+          console.log('UIManager: Processing timer value:', timerValue);
+          
+          // Ensure we have a valid number
+          if (typeof timerValue !== 'number' || isNaN(timerValue)) {
+            console.warn('UIManager: Invalid timer value:', timerValue);
+            timerElement.textContent = 'Preparing...';
+            return;
+          }
+
+          // Format and display the timer
+          const displayTime = Math.max(0, Math.floor(timerValue));
+          timerElement.textContent = `Next round in: ${displayTime}s`;
+        };
+
+        // If we have timer data directly from the event
+        if (data && typeof data.timer === 'number') {
+          console.log('UIManager: Using timer value from event:', data.timer);
+          updateTimerDisplay(data.timer);
+        } else {
+          // Otherwise fetch the current timer value
+          console.log('UIManager: Requesting current timer value');
+          window.game.eventSystem.emit('getInterRoundTimer', {
+            callback: (value) => {
+              console.log('UIManager: Received timer value:', value);
+              updateTimerDisplay(value);
+            }
+          });
+        }
+      }
+    });
   }
 
   updateRoundTracker(currentRound) {

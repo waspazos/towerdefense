@@ -832,8 +832,16 @@ export class Renderer {
   }
 
   render() {
-    if (this.renderer && this.scene && this.camera) {
+    console.log('Renderer.render called', {
+      hasScene: !!this.scene,
+      hasCamera: !!this.camera,
+      hasRenderer: !!this.renderer
+    });
+    
+    if (this.scene && this.camera && this.renderer) {
       this.renderer.render(this.scene, this.camera);
+    } else {
+      console.warn('Cannot render: missing required components');
     }
   }
 }
