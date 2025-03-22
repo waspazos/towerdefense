@@ -1,5 +1,5 @@
-import { creepConfig } from '../config/creepConfig.js';
-import {Entity} from "./Entity.js";
+import { creepConfig } from '/src/config/creepConfig.js';
+import {Entity} from "/src/entities/Entity.js";
 
 export class Creep extends Entity {
   constructor(type, pathIndex, difficulty = 1) {

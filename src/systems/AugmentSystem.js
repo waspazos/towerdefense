@@ -1,4 +1,4 @@
-import { augmentConfig } from '../config/augmentConfig.js';
+import { augmentConfig } from '/src/config/augmentConfig.js';
 
 export class AugmentSystem {
   constructor() {

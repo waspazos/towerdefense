@@ -1,6 +1,6 @@
-import { Creep } from "../entities/Creep.js";
-import { pathConfig } from "../config/pathConfig.js";
-import { roundConfig } from "../config/roundConfig.js";
+import { Creep } from "/src/entities/Creep.js";
+import { pathConfig } from "/src/config/pathConfig.js";
+import { roundConfig } from "/src/config/roundConfig.js";
 
 export class PathingSystem {
   constructor(eventSystem, renderer) {

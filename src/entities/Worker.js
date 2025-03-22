@@ -1,5 +1,5 @@
-import { workerConfig } from "../config/workerConfig.js";
-import {Entity} from "./Entity.js";
+import { workerConfig } from "/src/config/workerConfig.js";
+import {Entity} from "/src/entities/Entity.js";
 
 export class Worker extends Entity {
   constructor(position) {

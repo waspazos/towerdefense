@@ -1,5 +1,5 @@
-import {roundConfig} from '../config/roundConfig.js';
-import {towerConfig} from "../config/towerConfig.js";
+import {roundConfig} from '/src/config/roundConfig.js';
+import {towerConfig} from "/src/config/towerConfig.js";
 
 export class UIManager {
   constructor() {

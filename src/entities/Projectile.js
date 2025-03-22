@@ -1,5 +1,5 @@
-import { Entity } from './Entity.js';
-import { towerConfig } from '../config/towerConfig.js';
+import { Entity } from '/src/entities/Entity.js';
+import { towerConfig } from '/src/config/towerConfig.js';
 
 export class Projectile extends Entity {
     constructor(options) {

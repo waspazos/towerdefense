@@ -1,4 +1,4 @@
-import { Entity } from './Entity';
+import { Entity } from '/src/entities/Entity';
 
 export class King extends Entity {
     constructor(position) {

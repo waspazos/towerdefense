@@ -1,4 +1,4 @@
-import { roundConfig } from "../config/roundConfig.js";
+import { roundConfig } from "/src/config/roundConfig.js";
 
 class GameState {
   constructor() {

@@ -1,4 +1,4 @@
-import { Projectile } from "../entities/Projectile.js";
+import { Projectile } from "/src/entities/Projectile.js";
 
 export class CombatSystem {
   constructor(eventSystem, renderer) {

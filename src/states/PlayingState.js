@@ -1,6 +1,6 @@
-import { workerConfig } from "../config/workerConfig.js";
-import { Tower } from "../entities/Tower.js";
-import { Worker } from "../entities/Worker.js";
+import { workerConfig } from "/src/config/workerConfig.js";
+import { Tower } from "/src/entities/Tower.js";
+import { Worker } from "/src/entities/Worker.js";
 
 class PlayingState {
   constructor() {

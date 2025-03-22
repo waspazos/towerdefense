@@ -1,9 +1,9 @@
-import { Game } from "./Game.js";
-import { towerConfig } from "./config/towerConfig.js";
-import { augmentConfig } from "./config/augmentConfig.js";
-import { roundConfig } from "./config/roundConfig.js";
-import { creepConfig } from "./config/creepConfig.js";
-import { pathConfig } from "./config/pathConfig.js";
+import { Game } from "/src/Game.js";
+import { towerConfig } from "/src/config/towerConfig.js";
+import { augmentConfig } from "/src/config/augmentConfig.js";
+import { roundConfig } from "/src/config/roundConfig.js";
+import { creepConfig } from "/src/config/creepConfig.js";
+import { pathConfig } from "/src/config/pathConfig.js";
 
 // Start the game when page loads
 window.addEventListener("load", async () => {
