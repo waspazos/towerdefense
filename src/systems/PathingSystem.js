@@ -196,10 +196,13 @@ export class PathingSystem {
     const index = this.creeps.indexOf(creep);
     if (index !== -1) {
       this.creeps.splice(index, 1);
-    }
+      
+      // Increment killed counter
+      this.creepsKilled++;
 
-    // Increment killed counter
-    this.creepsKilled++;
+      // Now destroy the creep
+      creep.destroy();
+    }
   }
 
   handleCreepReachedEnd(data) {

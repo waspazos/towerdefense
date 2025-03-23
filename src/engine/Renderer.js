@@ -14,11 +14,10 @@ export class Renderer {
     this.scene = new window['THREE'].Scene();
     this.scene.background = new window['THREE'].Color(0x000000); // Black background
 
-    // Create camera with top-down view
+    // Create camera
     this.camera = new window['THREE'].PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(0, 50, 0); // Moved camera directly above
-    this.camera.lookAt(0, 0, 0); // Looking straight down
-    this.camera.up.set(0, 0, -1); // Adjust up vector to maintain proper orientation
+    this.camera.position.set(0, 50, 30); // Moved back and up to see more
+    this.camera.lookAt(0, 0, 0); // Looking at center of the scene
 
     // Create renderer
     this.renderer = new window['THREE'].WebGLRenderer({ antialias: true });
@@ -31,9 +30,6 @@ export class Renderer {
 
     // Create ground
     this.createTerrainGround();
-
-    // Create grid
-    this.createGrid();
 
     // Handle window resize
     window.addEventListener('resize', this.onWindowResize.bind(this), false);
@@ -74,42 +70,9 @@ export class Renderer {
 
     this.ground = new window['THREE'].Mesh(groundGeometry, groundMaterial);
     this.ground.rotation.x = -Math.PI / 2;
+    this.ground.position.y = 0; // Ground at 0
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
-  }
-
-  createGrid() {
-    // Create grid helper
-    const size = 40;
-    const divisions = 40;
-    const gridHelper = new window['THREE'].GridHelper(size, divisions, 0x444444, 0x222222);
-    gridHelper.position.y = 0.1; // Slightly above ground to prevent z-fighting
-    this.scene.add(gridHelper);
-
-    // Add coordinate labels
-    const labelMaterial = new window['THREE'].MeshBasicMaterial({ color: 0xffffff });
-    const loader = new window['THREE'].TextureLoader();
-
-    for (let x = -size/2; x <= size/2; x += 5) {
-      for (let z = -size/2; z <= size/2; z += 5) {
-        // Create coordinate text
-        const coord = `${x},${z}`;
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = 128;  // Doubled from 64
-        canvas.height = 64;  // Doubled from 32
-        context.fillStyle = '#ffffff';
-        context.font = '24px Arial';  // Doubled from 12px
-        context.fillText(coord, 10, 32);  // Adjusted position for larger canvas
-        
-        const texture = new window['THREE'].CanvasTexture(canvas);
-        const spriteMaterial = new window['THREE'].SpriteMaterial({ map: texture });
-        const sprite = new window['THREE'].Sprite(spriteMaterial);
-        sprite.position.set(x, 0.1, z);
-        sprite.scale.set(4, 2, 1);  // Doubled from (2, 1, 1)
-        this.scene.add(sprite);
-      }
-    }
   }
 
   createPath(paths) {
@@ -122,72 +85,63 @@ export class Renderer {
     this.pathGroup = new window['THREE'].Group();
 
     paths.forEach((path, pathIndex) => {
-      // Create path material with unique color for each path
-      const pathColor = pathIndex === 0 ? 0x00ff00 : 0x0000ff;
-      const pathMaterial = new window['THREE'].MeshStandardMaterial({
-        color: pathColor,
-        transparent: true,
-        opacity: 0.5
+      // Create path materials - one for the main path and one for edges
+      const mainPathColor = 0xC2B280; // Sandy/dirt color
+      const edgeColor = 0x8B4513;  // Darker brown for edges
+      
+      const mainPathMaterial = new window['THREE'].MeshStandardMaterial({
+        color: mainPathColor,
+        roughness: 0.8,
+        metalness: 0.1
+      });
+
+      const edgeMaterial = new window['THREE'].MeshStandardMaterial({
+        color: edgeColor,
+        roughness: 0.7,
+        metalness: 0.1
       });
 
       // Create path segments
-      for (let i = 0; i < path.length - 1; i++) {
-        const start = path[i];
-        const end = path[i + 1];
+      for (let i = 0; i < path.waypoints.length - 1; i++) {
+        const start = path.waypoints[i];
+        const end = path.waypoints[i + 1];
 
-        // Create path segment
+        // Create main path segment (wider)
         const direction = new window['THREE'].Vector3().subVectors(end, start);
         const length = direction.length();
-        const pathGeometry = new window['THREE'].BoxGeometry(1, 0.1, length);
-        const pathMesh = new window['THREE'].Mesh(pathGeometry, pathMaterial);
+        const mainPathGeometry = new window['THREE'].BoxGeometry(1, 0.3, length); // Reduced width to 1
+        const mainPathMesh = new window['THREE'].Mesh(mainPathGeometry, mainPathMaterial);
 
-        // Position path segment
-        pathMesh.position.copy(start).add(end).multiplyScalar(0.5);
-        pathMesh.lookAt(end);
-        pathMesh.position.y = 0.05; // Slightly above ground
+        // Position main path
+        mainPathMesh.position.copy(start).add(end).multiplyScalar(0.5);
+        mainPathMesh.lookAt(end);
+        mainPathMesh.position.y = 0.15; // Half of its height
+        mainPathMesh.receiveShadow = true;
 
-        this.pathGroup.add(pathMesh);
-
-        // Add waypoint marker
-        const waypointGeometry = new window['THREE'].CylinderGeometry(0.3, 0.3, 1, 8);
-        const waypointMaterial = new window['THREE'].MeshStandardMaterial({ color: pathColor });
-        const waypoint = new window['THREE'].Mesh(waypointGeometry, waypointMaterial);
-        waypoint.position.copy(start);
-        waypoint.position.y = 0.5;
-        this.pathGroup.add(waypoint);
-
-        // Add waypoint number
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = 64;
-        canvas.height = 64;
-        context.fillStyle = '#ffffff';
-        context.font = 'bold 32px Arial';
-        context.textAlign = 'center';
-        context.fillText(i.toString(), 32, 48);
+        // Create edge segments (thinner, slightly raised)
+        const edgeGeometry = new window['THREE'].BoxGeometry(0.2, 0.4, length); // Thinner edges
         
-        const texture = new window['THREE'].CanvasTexture(canvas);
-        const spriteMaterial = new window['THREE'].SpriteMaterial({ map: texture });
-        const sprite = new window['THREE'].Sprite(spriteMaterial);
-        sprite.position.copy(start);
-        sprite.position.y = 1.5;
-        sprite.scale.set(2, 2, 1);
-        this.pathGroup.add(sprite);
+        // Left edge
+        const leftEdge = new window['THREE'].Mesh(edgeGeometry, edgeMaterial);
+        leftEdge.position.copy(mainPathMesh.position);
+        leftEdge.rotation.copy(mainPathMesh.rotation);
+        leftEdge.position.y = 0.2; // Slightly higher than path
+        leftEdge.translateX(-0.6); // Adjusted for new width
+        leftEdge.receiveShadow = true;
+        leftEdge.castShadow = true;
 
-        // Add final waypoint marker for the last point
-        if (i === path.length - 2) {
-          const finalWaypoint = waypoint.clone();
-          finalWaypoint.position.copy(end);
-          finalWaypoint.position.y = 0.5;
-          this.pathGroup.add(finalWaypoint);
+        // Right edge
+        const rightEdge = new window['THREE'].Mesh(edgeGeometry, edgeMaterial);
+        rightEdge.position.copy(mainPathMesh.position);
+        rightEdge.rotation.copy(mainPathMesh.rotation);
+        rightEdge.position.y = 0.2; // Slightly higher than path
+        rightEdge.translateX(0.6); // Adjusted for new width
+        rightEdge.receiveShadow = true;
+        rightEdge.castShadow = true;
 
-          const finalSprite = sprite.clone();
-          finalSprite.position.copy(end);
-          finalSprite.position.y = 1.5;
-          context.fillText((i + 1).toString(), 32, 48);
-          finalSprite.material.map.needsUpdate = true;
-          this.pathGroup.add(finalSprite);
-        }
+        this.pathGroup.add(mainPathMesh);
+        this.pathGroup.add(leftEdge);
+        this.pathGroup.add(rightEdge);
       }
     });
 

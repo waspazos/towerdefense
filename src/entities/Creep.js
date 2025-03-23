@@ -150,15 +150,12 @@ export class Creep extends Entity {
   }
 
   die() {
-    // Emit death event before removing
+    // Emit death event and let PathingSystem handle destruction
     window.game.eventSystem.emit('creepKilled', {
       creep: this,
       goldValue: this.goldValue,
       position: this.position.clone()
     });
-
-    // Destroy this creep
-    this.destroy();
   }
 
   reachEnd() {
