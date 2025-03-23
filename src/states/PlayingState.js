@@ -1,48 +1,31 @@
-import { workerConfig } from "/src/config/workerConfig.js";
 import { Tower } from "/src/entities/Tower.js";
-import { Worker } from "/src/entities/Worker.js";
 
-class PlayingState {
-  constructor() {
+export class PlayingState {
+  constructor(eventSystem) {
+    this.eventSystem = eventSystem;
     this.isActive = false;
     this.towerSlotRangeIndicator = null;
 
     // Register event listeners
-    window.game.eventSystem.on("canvasClick", this.handleCanvasClick.bind(this));
-    window.game.eventSystem.on(
-      "towerOptionClicked",
-      this.handleTowerOptionClicked.bind(this),
-    );
-    window.game.eventSystem.on(
-      "upgradeTowerClicked",
-      this.handleUpgradeTowerClicked.bind(this),
-    );
-    window.game.eventSystem.on("sellTowerClicked", this.handleSellTowerClicked.bind(this));
-    window.game.eventSystem.on(
-      "cancelTowerActionClicked",
-      this.handleCancelTowerActionClicked.bind(this),
-    );
-    window.game.eventSystem.on("buyWorkerClicked", this.handleBuyWorkerClicked.bind(this));
-    window.game.eventSystem.on(
-      "showTowerSlotRangeIndicator",
-      this.showTowerSlotRangeIndicator.bind(this),
-    );
-    window.game.eventSystem.on(
-      "hideTowerSlotRangeIndicator",
-      this.hideTowerSlotRangeIndicator.bind(this),
-    );
-    window.game.eventSystem.on(
-      "createTowerSlotMesh",
-      this.handleCreateTowerSlotMesh.bind(this),
-    );
+    this.eventSystem.on("canvasClick", this.handleCanvasClick.bind(this));
+    this.eventSystem.on("towerOptionClicked", this.handleTowerOptionClicked.bind(this));
+    this.eventSystem.on("upgradeTowerClicked", this.handleUpgradeTowerClicked.bind(this));
+    this.eventSystem.on("sellTowerClicked", this.handleSellTowerClicked.bind(this));
+    this.eventSystem.on("cancelTowerActionClicked", this.handleCancelTowerActionClicked.bind(this));
+    this.eventSystem.on("showTowerSlotRangeIndicator", this.showTowerSlotRangeIndicator.bind(this));
+    this.eventSystem.on("hideTowerSlotRangeIndicator", this.hideTowerSlotRangeIndicator.bind(this));
+    
+    console.log("PlayingState: Initialized");
   }
 
   activate() {
     this.isActive = true;
+    console.log("PlayingState: Activated");
   }
 
   deactivate() {
     this.isActive = false;
+    console.log("PlayingState: Deactivated");
   }
 
   handleCanvasClick(data) {
@@ -64,10 +47,10 @@ class PlayingState {
 
     // Clear selections if clicking on empty space
     if (towerSlotIntersects.length === 0 && towerIntersects.length === 0) {
-      window.game.eventSystem.emit("towerSelected", { tower: null });
-      window.game.eventSystem.emit("towerSlotSelected", { slot: null });
-      window.game.eventSystem.emit("hideUI", { type: "towerActions" });
-      window.game.eventSystem.emit("hideUI", { type: "towerSelection" });
+      this.eventSystem.emit("towerSelected", { tower: null });
+      this.eventSystem.emit("towerSlotSelected", { slot: null });
+      this.eventSystem.emit("hideUI", { type: "towerActions" });
+      this.eventSystem.emit("hideUI", { type: "towerSelection" });
       return;
     }
 
@@ -76,20 +59,19 @@ class PlayingState {
       const slotMesh = towerSlotIntersects[0].object;
       const slot = window.game.gameState.towerSlots.find((s) => s.mesh === slotMesh);
       if (slot && !slot.occupied) {
-        window.game.eventSystem.emit("towerSlotSelected", { slot });
-        window.game.eventSystem.emit("showUI", { type: "towerSelection" });
+        this.eventSystem.emit("towerSlotSelected", { slot });
+        this.eventSystem.emit("showUI", { type: "towerSelection" });
       }
       return;
     }
 
     // Handle tower selection
     if (towerIntersects.length > 0) {
-      const towerMesh =
-        towerIntersects[0].object.parent || towerIntersects[0].object;
+      const towerMesh = towerIntersects[0].object.parent || towerIntersects[0].object;
       const tower = window.game.gameState.towers.find((t) => t.mesh === towerMesh);
       if (tower) {
-        window.game.eventSystem.emit("towerSelected", { tower });
-        window.game.eventSystem.emit("showUI", { type: "towerActions", data: { tower } });
+        this.eventSystem.emit("towerSelected", { tower });
+        this.eventSystem.emit("showUI", { type: "towerActions", data: { tower } });
       }
     }
   }
@@ -97,19 +79,18 @@ class PlayingState {
   handleTowerOptionClicked(data) {
     if (!this.isActive) return;
 
-    const { towerType, event } = data;
-    event.stopPropagation();
+    const { towerType } = data;
 
     if (!window.game.gameState.selectedTowerSlot) {
       return;
     }
 
     // Get tower cost from tower config
-    const towerCost = window.game.towerConfig[towerType].ranks[0].cost;
+    const towerCost = window.towerConfig.basic.ranks[0].cost;
 
     // Check if player can afford
     let canAfford = false;
-    window.game.eventSystem.emit("checkGold", {
+    this.eventSystem.emit("checkGold", {
       amount: towerCost,
       callback: (result) => {
         canAfford = result;
@@ -121,27 +102,27 @@ class PlayingState {
       return;
     }
 
+    // Store the selected slot index before we lose the reference
+    const selectedSlotIndex = window.game.gameState.selectedTowerSlot.index;
+    const selectedSlotPosition = window.game.gameState.selectedTowerSlot.position.clone();
+
     // Deduct gold
-    window.game.eventSystem.emit("spendGold", { amount: towerCost });
+    this.eventSystem.emit("spendGold", { amount: towerCost });
 
     // Build tower
-    const tower = new Tower(
-      towerType,
-      window.game.gameState.selectedTowerSlot.position.clone(),
-      window.game.gameState.selectedTowerSlot.index,
-    );
-
-    // Add to scene
-    window.game.eventSystem.emit("addToScene", { object: tower.mesh });
+    const tower = new Tower(selectedSlotPosition, selectedSlotIndex);
 
     // Emit tower built event
-    window.game.eventSystem.emit("towerBuilt", {
+    this.eventSystem.emit("towerBuilt", {
       tower,
-      slotIndex: window.game.gameState.selectedTowerSlot.index,
+      slotIndex: selectedSlotIndex,
     });
 
-    // Hide tower selection UI
-    window.game.eventSystem.emit("hideUI", { type: "towerSelection" });
+    // Hide tower selection UI and clear selection
+    this.eventSystem.emit("hideUI", { type: "towerSelection" });
+    this.eventSystem.emit("towerSlotSelected", { slot: null });
+    
+    console.log("PlayingState: Tower built at slot", selectedSlotIndex);
   }
 
   handleUpgradeTowerClicked() {
@@ -152,9 +133,11 @@ class PlayingState {
 
     if (upgraded) {
       // Update UI
-      window.game.eventSystem.emit("towerDetailsUpdated", {
+      this.eventSystem.emit("towerDetailsUpdated", {
         tower: window.game.gameState.selectedTower,
       });
+      
+      console.log("PlayingState: Tower upgraded to rank", window.game.gameState.selectedTower.rank);
     }
   }
 
@@ -165,75 +148,21 @@ class PlayingState {
     window.game.gameState.selectedTower.sell();
 
     // Hide tower actions UI
-    window.game.eventSystem.emit("hideUI", { type: "towerActions" });
+    this.eventSystem.emit("hideUI", { type: "towerActions" });
+    
+    console.log("PlayingState: Tower sold");
   }
 
   handleCancelTowerActionClicked() {
     if (!this.isActive) return;
 
     // Clear tower selection
-    window.game.eventSystem.emit("towerSelected", { tower: null });
+    this.eventSystem.emit("towerSelected", { tower: null });
 
     // Hide tower actions UI
-    window.game.eventSystem.emit("hideUI", { type: "towerActions" });
-  }
-
-  handleBuyWorkerClicked() {
-    if (!this.isActive) return;
-
-    // Check worker limit
-    const maxWorkers = workerConfig.base.maxWorkers;
-    if (window.game.gameState.workers.length >= maxWorkers) {
-      console.log(`Cannot hire more workers. Max limit: ${maxWorkers}`);
-      return;
-    }
-
-    // Get worker cost
-    const workerCost = workerConfig.base.cost;
-
-    // Check if player can afford
-    let canAfford = false;
-    window.game.eventSystem.emit("checkGold", {
-      amount: workerCost,
-      callback: (result) => {
-        canAfford = result;
-      },
-    });
-
-    if (!canAfford) {
-      console.log(`Cannot afford worker. Cost: ${workerCost}`);
-      return;
-    }
-
-    // Deduct gold
-    window.game.eventSystem.emit("spendGold", { amount: workerCost });
-
-    // Create new worker
-    const campPosition = workerConfig.camp.position;
-    const worker = new Worker(
-      new window['THREE'].Vector3(campPosition.x, 0, campPosition.z),
-    );
-
-    // Add to scene
-    window.game.eventSystem.emit("addToScene", { object: worker.mesh });
-
-    // Add to game state
-    window.game.gameState.workers.push(worker);
-
-    // Find an available rock
-    let availableRock = null;
-    window.game.eventSystem.emit("getAvailableRock", {
-      callback: (rock) => {
-        availableRock = rock;
-      },
-    });
-
-    if (availableRock) {
-      worker.assignRock(availableRock);
-    }
-
-    // Emit worker hired event
-    window.game.eventSystem.emit("workerHired", { worker });
+    this.eventSystem.emit("hideUI", { type: "towerActions" });
+    
+    console.log("PlayingState: Tower action canceled");
   }
 
   showTowerSlotRangeIndicator(data) {
@@ -246,25 +175,15 @@ class PlayingState {
 
     // Create new indicator
     this.towerSlotRangeIndicator = window.game.renderer.createRangeIndicator(position, 8);
-    window.game.eventSystem.emit("addToScene", { object: this.towerSlotRangeIndicator });
+    this.eventSystem.emit("addToScene", { object: this.towerSlotRangeIndicator });
   }
 
   hideTowerSlotRangeIndicator() {
     if (this.towerSlotRangeIndicator) {
-      window.game.eventSystem.emit("removeFromScene", {
+      this.eventSystem.emit("removeFromScene", {
         object: this.towerSlotRangeIndicator,
       });
       this.towerSlotRangeIndicator = null;
     }
   }
-
-  handleCreateTowerSlotMesh(data) {
-    const { callback } = data;
-    if (callback) {
-      const mesh = window.game.renderer.createTowerSlotMesh();
-      callback(mesh);
-    }
-  }
 }
-
-export default PlayingState;

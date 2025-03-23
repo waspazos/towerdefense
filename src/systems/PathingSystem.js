@@ -19,25 +19,18 @@ export class PathingSystem {
     // Register event listeners
     this.eventSystem.on("getPath", this.handleGetPath.bind(this));
     this.eventSystem.on("startRound", this.startRound.bind(this));
-    this.eventSystem.on("spawnCreep", this.spawnCreep.bind(this));
     this.eventSystem.on("creepKilled", this.handleCreepKilled.bind(this));
-    this.eventSystem.on(
-      "creepReachedEnd",
-      this.handleCreepReachedEnd.bind(this),
-    );
-    this.eventSystem.on(
-      "getTowerTargets",
-      this.handleGetTowerTargets.bind(this),
-    );
+    this.eventSystem.on("creepReachedEnd", this.handleCreepReachedEnd.bind(this));
+    this.eventSystem.on("getTowerTargets", this.handleGetTowerTargets.bind(this));
     this.eventSystem.on("reset", this.reset.bind(this));
     this.eventSystem.on("pause", this.pause.bind(this));
     this.eventSystem.on("resume", this.resume.bind(this));
     this.eventSystem.on("isRoundActive", this.handleIsRoundActive.bind(this));
+    
+    console.log("PathingSystem: Initialized");
   }
 
   initialize() {
-    console.log("Initializing PathingSystem...");
-    
     // Load paths from config
     this.paths = pathConfig.paths.map((pathConfig) => {
       return {
@@ -55,7 +48,7 @@ export class PathingSystem {
     // Visualize paths
     this.renderer.createPath(this.paths);
     
-    console.log(`Created ${this.paths.length} paths for creeps`);
+    console.log("PathingSystem: Created", this.paths.length, "paths");
   }
 
   update(delta) {
@@ -86,7 +79,12 @@ export class PathingSystem {
   handleGetTowerTargets(data) {
     const { tower, callback } = data;
     if (callback) {
-      callback(this.creeps);
+      // Filter creeps by tower range
+      const inRangeCreeps = this.creeps.filter(creep => {
+        const distance = tower.getDistanceTo(creep.position);
+        return distance <= tower.range;
+      });
+      callback(inRangeCreeps);
     }
   }
   
@@ -115,8 +113,6 @@ export class PathingSystem {
       return;
     }
 
-    console.log(`Starting round ${this.currentRound}, type: ${roundDef.type}`);
-
     // Get spawn pattern for this round type
     const spawnPattern = roundConfig.spawnPatterns[roundDef.type];
     if (!spawnPattern) {
@@ -125,13 +121,15 @@ export class PathingSystem {
     }
 
     // Set total creeps for this round
-    this.totalCreeps = spawnPattern.totalCreeps;
+    this.totalCreeps = roundDef.count;
 
     // Start spawning creeps
     this.startSpawning(roundDef, spawnPattern);
 
     // Emit round started event
     this.eventSystem.emit("roundStarted", { roundNumber: this.currentRound });
+    
+    console.log("PathingSystem: Starting round", roundNumber, "with", this.totalCreeps, "creeps");
   }
 
   startSpawning(roundDef, spawnPattern) {
@@ -139,22 +137,20 @@ export class PathingSystem {
     if (this.spawnTimer) {
       clearInterval(this.spawnTimer);
     }
-    
-    console.log(`Starting to spawn ${spawnPattern.totalCreeps} creeps, interval: ${spawnPattern.spawnInterval}s`);
 
     // Spawn first creep immediately
     this.spawnCreep({
       type: roundDef.type,
-      difficulty: roundDef.difficulty,
+      difficulty: roundConfig.types[roundDef.type].difficulty,
     });
 
     // Schedule remaining creeps
-    if (spawnPattern.totalCreeps > 1) {
+    if (this.totalCreeps > 1) {
       this.spawnTimer = setInterval(() => {
-        if (this.creepsSpawned < spawnPattern.totalCreeps) {
+        if (this.creepsSpawned < this.totalCreeps) {
           this.spawnCreep({
             type: roundDef.type,
-            difficulty: roundDef.difficulty,
+            difficulty: roundConfig.types[roundDef.type].difficulty,
           });
         } else {
           clearInterval(this.spawnTimer);
@@ -183,8 +179,6 @@ export class PathingSystem {
       // Increment counter
       this.creepsSpawned++;
 
-      console.log(`Spawned ${type} creep (${this.creepsSpawned}/${this.totalCreeps})`);
-
       // Emit creep spawned event
       this.eventSystem.emit("creepSpawned", { creep });
 
@@ -206,8 +200,6 @@ export class PathingSystem {
 
     // Increment killed counter
     this.creepsKilled++;
-    
-    console.log(`Creep killed: ${this.creepsKilled}/${this.totalCreeps}`);
   }
 
   handleCreepReachedEnd(data) {
@@ -221,8 +213,6 @@ export class PathingSystem {
 
     // Increment reached end counter
     this.creepsReachedEnd++;
-    
-    console.log(`Creep reached end: ${this.creepsReachedEnd}/${this.totalCreeps}`);
   }
 
   endRound() {
@@ -234,14 +224,14 @@ export class PathingSystem {
       this.spawnTimer = null;
     }
 
-    console.log(`Round ${this.currentRound} completed. Killed: ${this.creepsKilled}, Escaped: ${this.creepsReachedEnd}`);
-
     // Emit round complete event
     this.eventSystem.emit("roundCompleted", {
       roundNumber: this.currentRound,
       creepsKilled: this.creepsKilled,
       creepsReachedEnd: this.creepsReachedEnd,
     });
+    
+    console.log("PathingSystem: Round", this.currentRound, "completed. Killed:", this.creepsKilled, "Escaped:", this.creepsReachedEnd);
   }
 
   pause() {
@@ -259,10 +249,10 @@ export class PathingSystem {
 
       // Resume spawning at the current point
       this.spawnTimer = setInterval(() => {
-        if (this.creepsSpawned < spawnPattern.totalCreeps) {
+        if (this.creepsSpawned < this.totalCreeps) {
           this.spawnCreep({
             type: roundDef.type,
-            difficulty: roundDef.difficulty,
+            difficulty: roundConfig.types[roundDef.type].difficulty,
           });
         } else {
           clearInterval(this.spawnTimer);
@@ -291,6 +281,6 @@ export class PathingSystem {
       this.spawnTimer = null;
     }
     
-    console.log("PathingSystem reset");
+    console.log("PathingSystem: Reset");
   }
 }

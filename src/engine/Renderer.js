@@ -1,5 +1,3 @@
-import { towerConfig } from '../config/towerConfig.js';
-
 export class Renderer {
   constructor() {
     this.scene = null;
@@ -16,10 +14,11 @@ export class Renderer {
     this.scene = new window['THREE'].Scene();
     this.scene.background = new window['THREE'].Color(0x000000); // Black background
 
-    // Create camera
+    // Create camera with top-down view
     this.camera = new window['THREE'].PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(0, 40, 15);
-    this.camera.lookAt(0, 0, -5);
+    this.camera.position.set(0, 50, 0); // Moved camera directly above
+    this.camera.lookAt(0, 0, 0); // Looking straight down
+    this.camera.up.set(0, 0, -1); // Adjust up vector to maintain proper orientation
 
     // Create renderer
     this.renderer = new window['THREE'].WebGLRenderer({ antialias: true });
@@ -33,12 +32,13 @@ export class Renderer {
     // Create ground
     this.createTerrainGround();
 
-    // Create forest environment
-    this.createForestEnvironment();
+    // Create grid
+    this.createGrid();
 
     // Handle window resize
     window.addEventListener('resize', this.onWindowResize.bind(this), false);
 
+    console.log("Renderer: Initialized");
     return this.renderer.domElement;
   }
 
@@ -58,14 +58,14 @@ export class Renderer {
     directionalLight.shadow.camera.far = 100;
     this.scene.add(directionalLight);
 
-    // Add a subtle blue-tinted fill light for the forest
-    const forestLight = new window['THREE'].HemisphereLight(0x8888ff, 0x004400, 0.5);
-    this.scene.add(forestLight);
+    // Add a subtle blue-tinted fill light for atmosphere
+    const fillLight = new window['THREE'].HemisphereLight(0x8888ff, 0x004400, 0.5);
+    this.scene.add(fillLight);
   }
 
   createTerrainGround() {
     // Create a simple flat ground plane
-    const groundGeometry = new window['THREE'].PlaneGeometry(100, 80, 1, 1);
+    const groundGeometry = new window['THREE'].PlaneGeometry(100, 80);
     const groundMaterial = new window['THREE'].MeshStandardMaterial({
       color: 0x4e6940,
       wireframe: false,
@@ -78,57 +78,120 @@ export class Renderer {
     this.scene.add(this.ground);
   }
 
-  createForestEnvironment() {
-    // Empty function - we don't want trees or rocks anymore
+  createGrid() {
+    // Create grid helper
+    const size = 40;
+    const divisions = 40;
+    const gridHelper = new window['THREE'].GridHelper(size, divisions, 0x444444, 0x222222);
+    gridHelper.position.y = 0.1; // Slightly above ground to prevent z-fighting
+    this.scene.add(gridHelper);
+
+    // Add coordinate labels
+    const labelMaterial = new window['THREE'].MeshBasicMaterial({ color: 0xffffff });
+    const loader = new window['THREE'].TextureLoader();
+
+    for (let x = -size/2; x <= size/2; x += 5) {
+      for (let z = -size/2; z <= size/2; z += 5) {
+        // Create coordinate text
+        const coord = `${x},${z}`;
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 128;  // Doubled from 64
+        canvas.height = 64;  // Doubled from 32
+        context.fillStyle = '#ffffff';
+        context.font = '24px Arial';  // Doubled from 12px
+        context.fillText(coord, 10, 32);  // Adjusted position for larger canvas
+        
+        const texture = new window['THREE'].CanvasTexture(canvas);
+        const spriteMaterial = new window['THREE'].SpriteMaterial({ map: texture });
+        const sprite = new window['THREE'].Sprite(spriteMaterial);
+        sprite.position.set(x, 0.1, z);
+        sprite.scale.set(4, 2, 1);  // Doubled from (2, 1, 1)
+        this.scene.add(sprite);
+      }
+    }
   }
 
   createPath(paths) {
-    // Remove any existing path group
+    // Remove existing path group if it exists
     if (this.pathGroup) {
       this.scene.remove(this.pathGroup);
     }
 
-    // Create a new path group
+    // Create new path group
     this.pathGroup = new window['THREE'].Group();
-    this.scene.add(this.pathGroup);
 
-    // Create visual markers for each path
-    if (paths && paths.length > 0) {
-      paths.forEach((path, pathIndex) => {
-        // Create markers for spawn point
-        const spawnMarker = new window['THREE'].Mesh(
-          new window['THREE'].SphereGeometry(0.3, 16, 16),
-          new window['THREE'].MeshBasicMaterial({ color: 0x00ff00 })
-        );
-        spawnMarker.position.copy(path.spawnPoint);
-        this.pathGroup.add(spawnMarker);
-
-        // Create markers for waypoints
-        path.waypoints.forEach((waypoint, index) => {
-          const markerGeometry = new window['THREE'].SphereGeometry(0.3, 16, 16);
-          const markerMaterial = new window['THREE'].MeshBasicMaterial({
-            color: index === path.waypoints.length - 1 ? 0xff0000 : 0xffff00
-          });
-          const marker = new window['THREE'].Mesh(markerGeometry, markerMaterial);
-          marker.position.copy(waypoint);
-          this.pathGroup.add(marker);
-
-          // Create connecting lines
-          if (index > 0) {
-            const start = path.waypoints[index - 1];
-            const end = waypoint;
-            const lineGeometry = new window['THREE'].BufferGeometry().setFromPoints([start, end]);
-            const lineMaterial = new window['THREE'].LineBasicMaterial({
-              color: 0xffffff,
-              opacity: 0.5,
-              transparent: true
-            });
-            const line = new window['THREE'].Line(lineGeometry, lineMaterial);
-            this.pathGroup.add(line);
-          }
-        });
+    paths.forEach((path, pathIndex) => {
+      // Create path material with unique color for each path
+      const pathColor = pathIndex === 0 ? 0x00ff00 : 0x0000ff;
+      const pathMaterial = new window['THREE'].MeshStandardMaterial({
+        color: pathColor,
+        transparent: true,
+        opacity: 0.5
       });
-    }
+
+      // Create path segments
+      for (let i = 0; i < path.length - 1; i++) {
+        const start = path[i];
+        const end = path[i + 1];
+
+        // Create path segment
+        const direction = new window['THREE'].Vector3().subVectors(end, start);
+        const length = direction.length();
+        const pathGeometry = new window['THREE'].BoxGeometry(1, 0.1, length);
+        const pathMesh = new window['THREE'].Mesh(pathGeometry, pathMaterial);
+
+        // Position path segment
+        pathMesh.position.copy(start).add(end).multiplyScalar(0.5);
+        pathMesh.lookAt(end);
+        pathMesh.position.y = 0.05; // Slightly above ground
+
+        this.pathGroup.add(pathMesh);
+
+        // Add waypoint marker
+        const waypointGeometry = new window['THREE'].CylinderGeometry(0.3, 0.3, 1, 8);
+        const waypointMaterial = new window['THREE'].MeshStandardMaterial({ color: pathColor });
+        const waypoint = new window['THREE'].Mesh(waypointGeometry, waypointMaterial);
+        waypoint.position.copy(start);
+        waypoint.position.y = 0.5;
+        this.pathGroup.add(waypoint);
+
+        // Add waypoint number
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 64;
+        canvas.height = 64;
+        context.fillStyle = '#ffffff';
+        context.font = 'bold 32px Arial';
+        context.textAlign = 'center';
+        context.fillText(i.toString(), 32, 48);
+        
+        const texture = new window['THREE'].CanvasTexture(canvas);
+        const spriteMaterial = new window['THREE'].SpriteMaterial({ map: texture });
+        const sprite = new window['THREE'].Sprite(spriteMaterial);
+        sprite.position.copy(start);
+        sprite.position.y = 1.5;
+        sprite.scale.set(2, 2, 1);
+        this.pathGroup.add(sprite);
+
+        // Add final waypoint marker for the last point
+        if (i === path.length - 2) {
+          const finalWaypoint = waypoint.clone();
+          finalWaypoint.position.copy(end);
+          finalWaypoint.position.y = 0.5;
+          this.pathGroup.add(finalWaypoint);
+
+          const finalSprite = sprite.clone();
+          finalSprite.position.copy(end);
+          finalSprite.position.y = 1.5;
+          context.fillText((i + 1).toString(), 32, 48);
+          finalSprite.material.map.needsUpdate = true;
+          this.pathGroup.add(finalSprite);
+        }
+      }
+    });
+
+    this.scene.add(this.pathGroup);
   }
 
   createKing(position) {
@@ -160,668 +223,318 @@ export class Renderer {
     this.kingMesh.add(crown);
 
     this.scene.add(this.kingMesh);
-
     return this.kingMesh;
   }
 
   createCreepMesh(creepType) {
-    try {
-      // Create group to hold all monster parts
-      const monsterGroup = new window['THREE'].Group();
+    // Create group to hold all monster parts
+    const monsterGroup = new window['THREE'].Group();
 
-      // Set color based on creep type
-      let bodyColor, eyeColor, hornColor;
+    // Set color based on creep type
+    let bodyColor, eyeColor, hornColor;
 
-      switch(creepType) {
-        case 'fast':
-          bodyColor = 0x00AA00; // Green for fast creeps
-          eyeColor = 0xFFFF00;
-          hornColor = 0x006600;
-          break;
-        case 'armored':
-          bodyColor = 0x888888; // Gray for armored creeps
-          eyeColor = 0xFF0000;
-          hornColor = 0x444444;
-          break;
-        case 'swarm':
-          bodyColor = 0xAA00AA; // Purple for swarm creeps
-          eyeColor = 0x00FFFF;
-          hornColor = 0x660066;
-          break;
-        case 'boss':
-          bodyColor = 0x8B0000; // Dark red for boss
-          eyeColor = 0xFF0000;
-          hornColor = 0x4A0404;
-          break;
-      }
-
-      // Body - using combination of sphere and cylinder instead of capsule
-      const bodyGeometry = new window['THREE'].SphereGeometry(0.3, 16, 16);
-      const bodyMaterial = new window['THREE'].MeshStandardMaterial({ color: bodyColor });
-      const body = new window['THREE'].Mesh(bodyGeometry, bodyMaterial);
-      body.scale.y = 1.5; // Stretch the sphere to make it oval-shaped
-      body.castShadow = true;
-      monsterGroup.add(body);
-
-      // Head
-      const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
-      const headMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-      const head = new THREE.Mesh(headGeometry, headMaterial);
-      head.position.y = 0.4;
-      head.castShadow = true;
-      monsterGroup.add(head);
-
-      // Eyes - glowing yellow (or type-specific color)
-      const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
-      const eyeMaterial = new THREE.MeshStandardMaterial({
-        color: eyeColor,
-        emissive: eyeColor,
-        emissiveIntensity: 0.5
-      });
-
-      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      leftEye.position.set(-0.1, 0.45, 0.2);
-      monsterGroup.add(leftEye);
-
-      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      rightEye.position.set(0.1, 0.45, 0.2);
-      monsterGroup.add(rightEye);
-
-      // Special visual elements for each type
-      if (creepType === 'armored') {
-        // Add armor plates for armored creeps
-        const armorGeometry = new THREE.BoxGeometry(0.4, 0.1, 0.4);
-        const armorMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
-
-        // Add armor plates at different positions
-        for (let i = 0; i < 4; i++) {
-          const armor = new THREE.Mesh(armorGeometry, armorMaterial);
-          armor.position.set(0, 0.2 - (i * 0.15), 0);
-          monsterGroup.add(armor);
-        }
-
-        // Add helmet
-        const helmetGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.15, 8);
-        const helmet = new THREE.Mesh(helmetGeometry, armorMaterial);
-        helmet.position.set(0, 0.5, 0);
-        monsterGroup.add(helmet);
-      }
-
-      if (creepType === 'fast') {
-        // Streamlined body for fast creeps
-        body.scale.y = 1.8; // More elongated body
-        body.scale.x = 0.8; // Narrower
-        body.scale.z = 0.8;
-
-        // Add some speed lines
-        const lineGeometry = new THREE.BoxGeometry(0.05, 0.3, 0.05);
-        const lineMaterial = new THREE.MeshStandardMaterial({
-          color: 0x00FF00,
-          emissive: 0x00FF00,
-          emissiveIntensity: 0.3
-        });
-
-        for (let i = 0; i < 3; i++) {
-          const line = new THREE.Mesh(lineGeometry, lineMaterial);
-          line.position.set(-0.2 + (i * 0.2), 0, -0.2);
-          monsterGroup.add(line);
-        }
-      }
-
-      if (creepType === 'swarm') {
-        // Smaller body for swarm creeps
-        monsterGroup.scale.set(0.7, 0.7, 0.7);
-
-        // Add some particle effects
-        const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-        const particleMaterial = new THREE.MeshStandardMaterial({
-          color: 0xAA00AA,
-          emissive: 0xAA00AA,
-          emissiveIntensity: 0.3,
-          transparent: true,
-          opacity: 0.7
-        });
-
-        for (let i = 0; i < 8; i++) {
-          const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-          const angle = Math.random() * Math.PI * 2;
-          const radius = 0.3 + Math.random() * 0.2;
-          particle.position.set(
-            Math.cos(angle) * radius,
-            Math.random() * 0.6,
-            Math.sin(angle) * radius
-          );
-          monsterGroup.add(particle);
-        }
-      }
-
-      if (creepType === 'boss') {
-        // Scale up the entire monster for boss
-        monsterGroup.scale.set(2, 2, 2);
-
-        // Add glowing aura
-        const auraGeometry = new THREE.RingGeometry(0.8, 1.2, 32);
-        const auraMaterial = new THREE.MeshBasicMaterial({
-          color: 0xFF0000,
-          transparent: true,
-          opacity: 0.3,
-          side: THREE.DoubleSide
-        });
-        const aura = new THREE.Mesh(auraGeometry, auraMaterial);
-        aura.rotation.x = Math.PI / 2;
-        aura.position.y = 0.1;
-        monsterGroup.add(aura);
-
-        // Add spikes
-        const spikeGeometry = new THREE.ConeGeometry(0.1, 0.3, 8);
-        const spikeMaterial = new THREE.MeshStandardMaterial({ color: 0x4A0404 });
-
-        for (let i = 0; i < 8; i++) {
-          const spike = new THREE.Mesh(spikeGeometry, spikeMaterial);
-          const angle = (i / 8) * Math.PI * 2;
-          spike.position.set(
-            Math.cos(angle) * 0.6,
-            0.4,
-            Math.sin(angle) * 0.6
-          );
-          spike.lookAt(0, 0.4, 0);
-          monsterGroup.add(spike);
-        }
-      }
-
-      // Horns (unless we're a swarm creep, which has no horns)
-      if (creepType !== 'swarm') {
-        const hornGeometry = new THREE.ConeGeometry(0.08, 0.2, 8);
-        const hornMaterial = new THREE.MeshStandardMaterial({ color: hornColor });
-
-        const leftHorn = new THREE.Mesh(hornGeometry, hornMaterial);
-        leftHorn.position.set(-0.15, 0.6, 0);
-        leftHorn.rotation.x = -0.2;
-        monsterGroup.add(leftHorn);
-
-        const rightHorn = new THREE.Mesh(hornGeometry, hornMaterial);
-        rightHorn.position.set(0.15, 0.6, 0);
-        rightHorn.rotation.x = -0.2;
-        monsterGroup.add(rightHorn);
-      }
-
-      // Arms - using cylinders
-      const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
-      const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-
-      const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-      leftArm.position.set(-0.35, 0, 0);
-      leftArm.rotation.z = 0.3;
-      monsterGroup.add(leftArm);
-
-      const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-      rightArm.position.set(0.35, 0, 0);
-      rightArm.rotation.z = -0.3;
-      monsterGroup.add(rightArm);
-
-      // Legs - using cylinders
-      const legGeometry = new THREE.CylinderGeometry(0.07, 0.07, 0.4, 8);
-      const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-
-      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-      leftLeg.position.set(-0.15, -0.4, 0);
-      monsterGroup.add(leftLeg);
-
-      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-      rightLeg.position.set(0.15, -0.4, 0);
-      monsterGroup.add(rightLeg);
-
-      // Set the entire group to cast shadows
-      monsterGroup.traverse((object) => {
-        if (object.isMesh) {
-          object.castShadow = true;
-          object.receiveShadow = true;
-        }
-      });
-
-      // Add animation data
-      monsterGroup.userData = {
-        walkTime: 0,
-        walkSpeed: Math.random() * 0.5 + 0.5,
-        armSwing: { left: leftArm, right: rightArm },
-        legSwing: { left: leftLeg, right: rightLeg },
-        creepType: creepType // Store creep type for future reference
-      };
-
-      return monsterGroup;
-    } catch (error) {
-      console.log("Error creating monster mesh:", error);
-
-      // Fall back to the original simple sphere if there's an error
-      const creepGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-      const creepMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-      return new THREE.Mesh(creepGeometry, creepMaterial);
+    switch(creepType) {
+      case 'fast':
+        bodyColor = 0x00AA00; // Green for fast creeps
+        eyeColor = 0xFFFF00;
+        hornColor = 0x006600;
+        break;
+      case 'armored':
+        bodyColor = 0x888888; // Gray for armored creeps
+        eyeColor = 0xFF0000;
+        hornColor = 0x444444;
+        break;
+      case 'swarm':
+        bodyColor = 0xAA00AA; // Purple for swarm creeps
+        eyeColor = 0x00FFFF;
+        hornColor = 0x660066;
+        break;
+      case 'boss':
+        bodyColor = 0x8B0000; // Dark red for boss
+        eyeColor = 0xFF0000;
+        hornColor = 0x4A0404;
+        break;
+      default:
+        bodyColor = 0xFF0000; // Red default
+        eyeColor = 0xFFFF00;
+        hornColor = 0x880000;
     }
-  }
 
-  createTowerMesh(towerType, rank) {
-    const towerGeometry = new THREE.BoxGeometry(1, 2, 1);
-    const towerConf = towerConfig[towerType];
-    const towerColor = towerConf.ranks[rank-1].color;
+    // Body
+    const bodyGeometry = new window['THREE'].SphereGeometry(0.3, 16, 16);
+    const bodyMaterial = new window['THREE'].MeshStandardMaterial({ color: bodyColor });
+    const body = new window['THREE'].Mesh(bodyGeometry, bodyMaterial);
+    body.scale.y = 1.5; // Stretch the sphere to make it oval-shaped
+    body.castShadow = true;
+    monsterGroup.add(body);
 
-    const towerMaterial = new THREE.MeshStandardMaterial({
-      color: towerColor
+    // Head
+    const headGeometry = new window['THREE'].SphereGeometry(0.25, 16, 16);
+    const headMaterial = new window['THREE'].MeshStandardMaterial({ color: bodyColor });
+    const head = new window['THREE'].Mesh(headGeometry, headMaterial);
+    head.position.y = 0.4;
+    head.castShadow = true;
+    monsterGroup.add(head);
+
+    // Eyes
+    const eyeGeometry = new window['THREE'].SphereGeometry(0.06, 8, 8);
+    const eyeMaterial = new window['THREE'].MeshStandardMaterial({
+      color: eyeColor,
+      emissive: eyeColor,
+      emissiveIntensity: 0.5
     });
-    const towerMesh = new THREE.Mesh(towerGeometry, towerMaterial);
-    towerMesh.castShadow = true;
-    towerMesh.receiveShadow = true;
 
-    // Add turret/cannon
-    const turretGeometry = new THREE.CylinderGeometry(0.2, 0.3, 0.8, 8);
+    const leftEye = new window['THREE'].Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.1, 0.45, 0.2);
+    monsterGroup.add(leftEye);
 
-    // Different turret color for frost towers
-    let turretColor;
-    if (towerType === 'frost') {
-      turretColor = rank === 1 ? 0x4682B4 : 0x0000CD; // Darker blue for turret
-    } else if (towerType === 'fire') {
-      turretColor = rank === 1 ? 0x8B0000 : 0x800000; // Dark red for turret
-    } else {
-      turretColor = 0x333333; // Default dark gray for basic tower
-    }
+    const rightEye = new window['THREE'].Mesh(eyeGeometry, eyeMaterial);
+    rightEye.position.set(0.1, 0.45, 0.2);
+    monsterGroup.add(rightEye);
 
-    const turretMaterial = new THREE.MeshStandardMaterial({ color: turretColor });
-    const turretMesh = new THREE.Mesh(turretGeometry, turretMaterial);
-    turretMesh.position.set(0, 1, 0);
-    turretMesh.rotation.x = Math.PI / 2;
-    towerMesh.add(turretMesh);
+    // Special visual elements for each type
+    if (creepType === 'armored') {
+      // Add armor plates
+      const armorGeometry = new window['THREE'].BoxGeometry(0.4, 0.1, 0.4);
+      const armorMaterial = new window['THREE'].MeshStandardMaterial({ color: 0x444444, metalness: 0.8 });
 
-    // Add special effects for frost tower
-    if (towerType === 'frost') {
-      // Add a glowing orb at the end of the turret
-      const orbGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-      const orbMaterial = new THREE.MeshStandardMaterial({
-        color: 0xADD8E6,
-        emissive: 0xADD8E6,
-        emissiveIntensity: 0.7
-      });
-      const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
-      orbMesh.position.set(0, 0, 0.5); // Position at end of turret
-      turretMesh.add(orbMesh);
-    } else if (towerType === 'fire') {
-      // Add a glowing fire orb at the end of the turret
-      const orbGeometry = new THREE.SphereGeometry(0.15, 8, 8);
-      const orbMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff4500,
-        emissive: 0xff4500,
-        emissiveIntensity: 0.8
-      });
-      const orbMesh = new THREE.Mesh(orbGeometry, orbMaterial);
-      orbMesh.position.set(0, 0, 0.5); // Position at end of turret
-      turretMesh.add(orbMesh);
-
-      // Add fire particles
-      const particleGeometry = new THREE.SphereGeometry(0.05, 4, 4);
-      const particleMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff8c00,
-        emissive: 0xff8c00,
-        emissiveIntensity: 0.6,
-        transparent: true,
-        opacity: 0.8
-      });
-
-      // Create multiple particles
-      for (let i = 0; i < 6; i++) {
-        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-        const angle = (i / 6) * Math.PI * 2;
-        particle.position.set(
-          Math.cos(angle) * 0.2,
-          Math.sin(angle) * 0.2,
-          0.5
-        );
-        particle.userData = {
-          originalPos: particle.position.clone(),
-          speed: Math.random() * 0.5 + 0.5,
-          angle: angle
-        };
-        turretMesh.add(particle);
+      for (let i = 0; i < 4; i++) {
+        const armor = new window['THREE'].Mesh(armorGeometry, armorMaterial);
+        armor.position.set(0, 0.2 - (i * 0.15), 0);
+        monsterGroup.add(armor);
       }
     }
 
-    return towerMesh;
+    if (creepType === 'fast') {
+      // More elongated body
+      body.scale.y = 1.8;
+      body.scale.x = 0.8;
+      body.scale.z = 0.8;
+    }
+
+    if (creepType === 'swarm') {
+      // Smaller body
+      monsterGroup.scale.set(0.7, 0.7, 0.7);
+    }
+
+    if (creepType === 'boss') {
+      // Scale up the entire monster for boss
+      monsterGroup.scale.set(2, 2, 2);
+
+      // Add spikes
+      const spikeGeometry = new window['THREE'].ConeGeometry(0.1, 0.3, 8);
+      const spikeMaterial = new window['THREE'].MeshStandardMaterial({ color: 0x4A0404 });
+
+      for (let i = 0; i < 8; i++) {
+        const spike = new window['THREE'].Mesh(spikeGeometry, spikeMaterial);
+        const angle = (i / 8) * Math.PI * 2;
+        spike.position.set(
+          Math.cos(angle) * 0.6,
+          0.4,
+          Math.sin(angle) * 0.6
+        );
+        spike.lookAt(0, 0.4, 0);
+        monsterGroup.add(spike);
+      }
+    }
+
+    // Arms
+    const armGeometry = new window['THREE'].CylinderGeometry(0.05, 0.05, 0.3, 8);
+    const armMaterial = new window['THREE'].MeshStandardMaterial({ color: bodyColor });
+
+    const leftArm = new window['THREE'].Mesh(armGeometry, armMaterial);
+    leftArm.position.set(-0.35, 0, 0);
+    leftArm.rotation.z = 0.3;
+    monsterGroup.add(leftArm);
+
+    const rightArm = new window['THREE'].Mesh(armGeometry, armMaterial);
+    rightArm.position.set(0.35, 0, 0);
+    rightArm.rotation.z = -0.3;
+    monsterGroup.add(rightArm);
+
+    // Legs
+    const legGeometry = new window['THREE'].CylinderGeometry(0.07, 0.07, 0.4, 8);
+    const legMaterial = new window['THREE'].MeshStandardMaterial({ color: bodyColor });
+
+    const leftLeg = new window['THREE'].Mesh(legGeometry, legMaterial);
+    leftLeg.position.set(-0.15, -0.4, 0);
+    monsterGroup.add(leftLeg);
+
+    const rightLeg = new window['THREE'].Mesh(legGeometry, legMaterial);
+    rightLeg.position.set(0.15, -0.4, 0);
+    monsterGroup.add(rightLeg);
+
+    // Set shadows
+    monsterGroup.traverse((object) => {
+      if (object.isMesh) {
+        object.castShadow = true;
+        object.receiveShadow = true;
+      }
+    });
+
+    return monsterGroup;
   }
 
-  createWorkerMesh() {
-    try {
-      // Create group to hold all worker parts
-      const workerGroup = new THREE.Group();
-
-      // Worker-specific colors
-      const bodyColor = 0x4169E1; // Royal blue for workers
-      const eyeColor = 0xFFFFFF;
-      const toolColor = 0x8B4513; // Brown for tools
-
-      // Body - using combination of sphere and cylinder instead of capsule
-      const bodyGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-      const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-      const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-      body.scale.y = 1.5; // Stretch the sphere to make it oval-shaped
-      body.castShadow = true;
-      workerGroup.add(body);
-
-      // Head
-      const headGeometry = new THREE.SphereGeometry(0.25, 16, 16);
-      const headMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-      const head = new THREE.Mesh(headGeometry, headMaterial);
-      head.position.y = 0.4;
-      head.castShadow = true;
-      workerGroup.add(head);
-
-      // Eyes - white and friendly
-      const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
-      const eyeMaterial = new THREE.MeshStandardMaterial({
-        color: eyeColor,
-        emissive: eyeColor,
-        emissiveIntensity: 0.3
-      });
-
-      const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      leftEye.position.set(-0.1, 0.45, 0.2);
-      workerGroup.add(leftEye);
-
-      const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-      rightEye.position.set(0.1, 0.45, 0.2);
-      workerGroup.add(rightEye);
-
-      // Add a mining pickaxe
-      const pickaxeGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.1);
-      const pickaxeMaterial = new THREE.MeshStandardMaterial({ color: toolColor });
-      const pickaxe = new THREE.Mesh(pickaxeGeometry, pickaxeMaterial);
-      pickaxe.position.set(0.4, 0, 0);
-      pickaxe.rotation.z = -0.3;
-      workerGroup.add(pickaxe);
-
-      // Add pickaxe head
-      const pickaxeHeadGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.1);
-      const pickaxeHead = new THREE.Mesh(pickaxeHeadGeometry, pickaxeMaterial);
-      pickaxeHead.position.set(0.5, 0.2, 0);
-      pickaxeHead.rotation.z = -0.3;
-      workerGroup.add(pickaxeHead);
-
-      // Arms - using cylinders
-      const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
-      const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-
-      const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-      leftArm.position.set(-0.35, 0, 0);
-      leftArm.rotation.z = 0.3;
-      workerGroup.add(leftArm);
-
-      const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-      rightArm.position.set(0.35, 0, 0);
-      rightArm.rotation.z = -0.3;
-      workerGroup.add(rightArm);
-
-      // Legs - using cylinders
-      const legGeometry = new THREE.CylinderGeometry(0.07, 0.07, 0.4, 8);
-      const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-
-      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-      leftLeg.position.set(-0.15, -0.4, 0);
-      workerGroup.add(leftLeg);
-
-      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-      rightLeg.position.set(0.15, -0.4, 0);
-      workerGroup.add(rightLeg);
-
-      // Set the entire group to cast shadows
-      workerGroup.traverse((object) => {
-        if (object.isMesh) {
-          object.castShadow = true;
-          object.receiveShadow = true;
-        }
-      });
-
-      // Add animation data
-      workerGroup.userData = {
-        walkTime: 0,
-        walkSpeed: Math.random() * 0.5 + 0.5,
-        armSwing: { left: leftArm, right: rightArm },
-        legSwing: { left: leftLeg, right: rightLeg }
-      };
-
-      return workerGroup;
-    } catch (error) {
-      console.log("Error creating worker mesh:", error);
-
-      // Fall back to a simple worker mesh if there's an error
-      const workerGeometry = new THREE.BoxGeometry(0.5, 1, 0.5);
-      const workerMaterial = new THREE.MeshStandardMaterial({ color: 0x4169E1 });
-      return new THREE.Mesh(workerGeometry, workerMaterial);
+  createTowerMesh(rank = 1) {
+    const towerGroup = new window['THREE'].Group();
+    
+    // Tower base
+    const baseGeometry = new window['THREE'].BoxGeometry(1, 0.5, 1);
+    const baseMaterial = new window['THREE'].MeshStandardMaterial({ color: 0x8b4513 });
+    const base = new window['THREE'].Mesh(baseGeometry, baseMaterial);
+    base.position.y = 0.25;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    towerGroup.add(base);
+    
+    // Tower body
+    const bodyGeometry = new window['THREE'].BoxGeometry(0.8, 1.5, 0.8);
+    const bodyMaterial = new window['THREE'].MeshStandardMaterial({ color: 0x666666 });
+    const body = new window['THREE'].Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 1.25;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    towerGroup.add(body);
+    
+    // Tower turret
+    const turretGeometry = new window['THREE'].CylinderGeometry(0.2, 0.3, 0.8, 8);
+    const turretMaterial = new window['THREE'].MeshStandardMaterial({ color: 0x333333 });
+    const turret = new window['THREE'].Mesh(turretGeometry, turretMaterial);
+    turret.position.y = 2.25;
+    turret.rotation.x = Math.PI / 2;
+    turret.castShadow = true;
+    turret.receiveShadow = true;
+    towerGroup.add(turret);
+    
+    // Add rank indicator
+    for (let i = 0; i < rank; i++) {
+      const stripeGeometry = new window['THREE'].BoxGeometry(0.9, 0.1, 0.1);
+      const stripeMaterial = new window['THREE'].MeshStandardMaterial({ color: 0xffd700 });
+      const stripe = new window['THREE'].Mesh(stripeGeometry, stripeMaterial);
+      stripe.position.set(0, 0.7 + (i * 0.2), 0.45);
+      body.add(stripe);
     }
+    
+    return towerGroup;
   }
 
   createTowerSlotMesh() {
     // Create visual representation of the slot
-    const slotGeometry = new THREE.BoxGeometry(1.5, 0.2, 1.5);
-    const slotMaterial = new THREE.MeshStandardMaterial({
+    const slotGeometry = new window['THREE'].BoxGeometry(1.5, 0.2, 1.5);
+    const slotMaterial = new window['THREE'].MeshStandardMaterial({
       color: 0x8b4513,
       transparent: true,
       opacity: 0.8
     });
 
-    const slotMesh = new THREE.Mesh(slotGeometry, slotMaterial);
+    const slotMesh = new window['THREE'].Mesh(slotGeometry, slotMaterial);
     slotMesh.receiveShadow = true;
-
-    // Make the slot interactive
-    slotMesh.userData = {
-      type: 'towerSlot'
-    };
-
     return slotMesh;
   }
 
   createRangeIndicator(position, range) {
     // Create a ring geometry for the range indicator
-    const ringGeometry = new THREE.RingGeometry(range - 0.1, range, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({
+    const ringGeometry = new window['THREE'].RingGeometry(range - 0.1, range, 32);
+    const ringMaterial = new window['THREE'].MeshBasicMaterial({
       color: 0x00ff00,
       transparent: true,
       opacity: 0.3,
-      side: THREE.DoubleSide
+      side: window['THREE'].DoubleSide
     });
 
-    const rangeIndicator = new THREE.Mesh(ringGeometry, ringMaterial);
+    const rangeIndicator = new window['THREE'].Mesh(ringGeometry, ringMaterial);
     rangeIndicator.rotation.x = -Math.PI / 2; // Lay flat on the ground
     rangeIndicator.position.copy(position);
-    rangeIndicator.userData.type = 'rangeIndicator';
-
+    rangeIndicator.position.y = 0.1; // Slightly above ground
+    
     return rangeIndicator;
   }
 
-  createRock(x, z) {
-    const rockGroup = new THREE.Group();
-
-    // Create main rock body
-    const rockGeometry = new THREE.DodecahedronGeometry(0.8, 0);
-    const rockMaterial = new THREE.MeshPhongMaterial({ color: 0x808080 });
-    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
-    rockGroup.add(rock);
-
-    // Add some smaller rocks for variety
-    for (let i = 0; i < 3; i++) {
-      const smallRockGeometry = new THREE.DodecahedronGeometry(0.3, 0);
-      const smallRockMaterial = new THREE.MeshPhongMaterial({ color: 0x909090 });
-      const smallRock = new THREE.Mesh(smallRockGeometry, smallRockMaterial);
-
-      // Position small rocks around the main rock
-      const angle = (i / 3) * Math.PI * 2;
-      smallRock.position.x = Math.cos(angle) * 0.5;
-      smallRock.position.z = Math.sin(angle) * 0.5;
-      smallRock.position.y = 0.2;
-
-      rockGroup.add(smallRock);
-    }
-
-    // Position the rock group
-    rockGroup.position.set(x, 0, z);
-
-    // Add userData to the rock group
-    rockGroup.userData = {
-      type: 'mining-rock',
-      isOccupied: false
-    };
-
-    // Add to scene
-    this.scene.add(rockGroup);
-    return rockGroup;
-  }
-
-  createProjectileMesh(color) {
-    const projectileGroup = new THREE.Group();
-
-    // Main projectile sphere
-    const projectileGeometry = new THREE.SphereGeometry(0.1, 8, 8);
-    const projectileMaterial = new THREE.MeshStandardMaterial({
-      color: color,
-      emissive: color,
+  createProjectileMesh() {
+    const projectileGeometry = new window['THREE'].SphereGeometry(0.2, 8, 8);
+    const projectileMaterial = new window['THREE'].MeshStandardMaterial({
+      color: 0xffff00,
+      emissive: 0xffff00,
       emissiveIntensity: 0.5
     });
+    
+    const projectile = new window['THREE'].Mesh(projectileGeometry, projectileMaterial);
+    projectile.castShadow = true;
+    
+    return projectile;
+  }
 
-    const projectileMesh = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    projectileGroup.add(projectileMesh);
-
-    // For frost projectiles (blue colors), add enhanced ice effect
-    if (color === 0x6495ED || color === 0x1E90FF) {
-      // Larger glowing core for frost projectiles
-      const coreGeometry = new THREE.SphereGeometry(0.15, 12, 12);
-      const coreMaterial = new THREE.MeshStandardMaterial({
-        color: 0xADD8E6,
-        transparent: true,
-        opacity: 0.7,
-        emissive: 0xADD8E6,
-        emissiveIntensity: 0.8
-      });
-
-      const coreEffect = new THREE.Mesh(coreGeometry, coreMaterial);
-      coreEffect.scale.set(0.8, 0.8, 0.8);
-      projectileGroup.add(coreEffect);
-
-      // Add ice crystal shards around the projectile
-      const shardGeometry = new THREE.ConeGeometry(0.05, 0.2, 4);
-      const shardMaterial = new THREE.MeshStandardMaterial({
-        color: 0xCCEEFF,
-        transparent: true,
-        opacity: 0.9,
-        emissive: 0xCCEEFF,
-        emissiveIntensity: 0.3
-      });
-
-      // Create multiple shards pointing outward
-      for (let i = 0; i < 8; i++) {
-        const shard = new THREE.Mesh(shardGeometry, shardMaterial);
-
-        // Position around the sphere
-        const angle = (i / 8) * Math.PI * 2;
-        shard.position.set(
-          Math.cos(angle) * 0.15,
-          Math.sin(angle) * 0.15,
-          0
-        );
-
-        // Rotate to point outward
-        shard.rotation.z = angle + Math.PI;
-        shard.rotation.y = Math.random() * 0.5;
-
-        projectileGroup.add(shard);
-      }
-    } else if (color === 0xff4500 || color === 0xff0000) {
-      // Fire projectile effects
-      const coreGeometry = new THREE.SphereGeometry(0.15, 12, 12);
-      const coreMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff8c00,
-        transparent: true,
-        opacity: 0.7,
-        emissive: 0xff8c00,
-        emissiveIntensity: 0.8
-      });
-
-      const coreEffect = new THREE.Mesh(coreGeometry, coreMaterial);
-      coreEffect.scale.set(0.8, 0.8, 0.8);
-      projectileGroup.add(coreEffect);
-
-      // Add fire particles
-      const particleGeometry = new THREE.SphereGeometry(0.03, 4, 4);
-      const particleMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff4500,
-        transparent: true,
-        opacity: 0.8,
-        emissive: 0xff4500,
-        emissiveIntensity: 0.6
-      });
-
-      // Add more particles for a better trail effect
-      for (let i = 0; i < 8; i++) {
-        const particle = new THREE.Mesh(particleGeometry, particleMaterial);
-        // Position behind the main projectile in a random pattern
-        particle.position.set(
-          (Math.random() - 0.5) * 0.1,
-          (Math.random() - 0.5) * 0.1,
-          -(i + 1) * 0.1
-        );
-        particle.scale.set(
-          0.8 - (i * 0.1),
-          0.8 - (i * 0.1),
-          0.8 - (i * 0.1)
-        );
-        projectileGroup.add(particle);
-      }
-
-      // Store animation data in user data
-      projectileGroup.userData = {
-        rotationSpeed: Math.random() * 0.1 + 0.05,
-        pulseTime: 0
-      };
-    }
-
-    return projectileGroup;
+  createHitEffect(position) {
+    const effectGroup = new window['THREE'].Group();
+    
+    // Flash
+    const flashGeometry = new window['THREE'].SphereGeometry(0.3, 8, 8);
+    const flashMaterial = new window['THREE'].MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const flash = new window['THREE'].Mesh(flashGeometry, flashMaterial);
+    flash.position.copy(position);
+    
+    effectGroup.add(flash);
+    this.scene.add(effectGroup);
+    
+    // Animate and remove after duration
+    setTimeout(() => {
+      this.scene.remove(effectGroup);
+    }, 300);
+    
+    return effectGroup;
   }
 
   createFloatingDamageNumber(position, damage, isCritical = false) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = 128;
-    canvas.height = 64;
+    canvas.width = 64;
+    canvas.height = 32;
 
     // Set up text style
-    ctx.fillStyle = isCritical ? '#ff0000' : '#ffffff';
-    ctx.font = 'bold 48px Arial';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-
-    // Add text shadow for better visibility
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
 
     // Draw the damage number
     ctx.fillText(Math.round(damage).toString(), canvas.width / 2, canvas.height / 2);
 
-    // Create texture from canvas
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 1,
-        depthTest: false // Ensure it's always visible
-      })
-    );
-
-    // Set initial position and scale
+    // Create sprite from canvas
+    const texture = new window['THREE'].CanvasTexture(canvas);
+    const spriteMaterial = new window['THREE'].SpriteMaterial({
+      map: texture,
+      transparent: true
+    });
+    
+    const sprite = new window['THREE'].Sprite(spriteMaterial);
     sprite.position.copy(position);
-    sprite.position.y += 1; // Start above the target
-    sprite.scale.set(2, 1, 1); // Make the sprite wider for better readability
-
+    sprite.position.y += 1; // Place above the target
+    sprite.scale.set(2, 1, 1);
+    
     this.scene.add(sprite);
-
+    
+    // Animate and remove after duration
+    const startTime = Date.now();
+    const duration = 1000; // ms
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < duration) {
+        sprite.position.y += 0.01;
+        sprite.material.opacity = 1 - (elapsed / duration);
+        requestAnimationFrame(animate);
+      } else {
+        this.scene.remove(sprite);
+      }
+    };
+    
+    animate();
+    
     return sprite;
   }
 
@@ -832,16 +545,8 @@ export class Renderer {
   }
 
   render() {
-    console.log('Renderer.render called', {
-      hasScene: !!this.scene,
-      hasCamera: !!this.camera,
-      hasRenderer: !!this.renderer
-    });
-    
     if (this.scene && this.camera && this.renderer) {
       this.renderer.render(this.scene, this.camera);
-    } else {
-      console.warn('Cannot render: missing required components');
     }
   }
 }

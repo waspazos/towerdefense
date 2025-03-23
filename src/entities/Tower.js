@@ -2,31 +2,23 @@ import { Entity } from '/src/entities/Entity.js';
 import { towerConfig } from '/src/config/towerConfig.js';
 
 export class Tower extends Entity {
-    constructor(type, position, slotIndex, rank = 1) {
-        const mesh = window.game.renderer.createTowerMesh(type, rank);
+    constructor(position, slotIndex, rank = 1) {
+        const mesh = window.game.renderer.createTowerMesh(rank);
         super(position, mesh);
 
-        this.type = type;
+        this.type = 'basic';
         this.rank = rank;
         this.slotIndex = slotIndex;
 
         // Load configuration
-        const config = towerConfig[type].ranks[rank-1];
+        const config = towerConfig.basic.ranks[rank-1];
         this.damage = config.damage;
         this.attackSpeed = config.attackSpeed;
-        this.range = 8; // Default range
+        this.range = 8; // Default range for all towers
         this.attackTimer = 0;
         this.totalCost = config.cost;
 
-        // Special properties based on tower type
-        if (type === 'frost') {
-            this.slowAmount = config.slowAmount;
-        } else if (type === 'fire') {
-            this.critChance = config.critChance || 0.4;
-            this.critMultiplier = config.critMultiplier || 1.5;
-        }
-
-        // Create range indicator (hidden by default)
+        // Range indicator (hidden by default)
         this.rangeIndicator = null;
     }
 
@@ -46,10 +38,6 @@ export class Tower extends Entity {
                     if (target) this.fireProjectile(target);
                 });
                 this.attackTimer = 0;
-            } else if (targets) {
-                // Single target for other tower types
-                this.fireProjectile(targets);
-                this.attackTimer = 0;
             }
         }
     }
@@ -61,62 +49,30 @@ export class Tower extends Entity {
             creeps.push(...targets);
         }});
 
-        // For basic towers, find up to 2 targets
-        if (this.type === 'basic') {
-            const targets = [];
-            const sortedCreeps = [...creeps].sort((a, b) => b.progress - a.progress);
-
-            for (let i = 0; i < sortedCreeps.length && targets.length < 2; i++) {
-                const creep = sortedCreeps[i];
-                const distance = this.getDistanceTo(creep.position);
-
-                if (distance <= this.range) {
-                    targets.push(creep);
-                }
-            }
-
-            return targets;
-        }
-
-        // For other towers, find single target
+        // Find up to 2 targets
+        const targets = [];
         const sortedCreeps = [...creeps].sort((a, b) => b.progress - a.progress);
 
-        for (let i = 0; i < sortedCreeps.length; i++) {
+        for (let i = 0; i < sortedCreeps.length && targets.length < 2; i++) {
             const creep = sortedCreeps[i];
             const distance = this.getDistanceTo(creep.position);
 
             if (distance <= this.range) {
-                return creep;
+                targets.push(creep);
             }
         }
 
-        return null;
+        return targets;
     }
 
     fireProjectile(target) {
-        // Check if this is a critical hit (for fire towers)
-        let isCritical = false;
-        let damageMultiplier = 1;
-
-        if (this.type === 'fire' && this.critChance > 0) {
-            isCritical = Math.random() < this.critChance;
-            if (isCritical) {
-                damageMultiplier = this.critMultiplier || 1.5;
-            }
-        }
-
         // Create projectile via event system
         window.game.eventSystem.emit('createProjectile', {
             position: this.position.clone(),
             target: target,
-            damage: this.damage * damageMultiplier,
-            towerType: this.type,
-            towerRank: this.rank,
-            isCritical: isCritical
+            damage: this.damage,
+            tower: this
         });
-
-        // Apply "Towers of Rage" augment if active
-        window.game.eventSystem.emit('towerAttacked', { tower: this });
     }
 
     upgrade() {
@@ -124,13 +80,16 @@ export class Tower extends Entity {
         if (this.rank >= 5) return false;
 
         // Get upgrade cost
-        const upgradeCost = towerConfig[this.type].ranks[this.rank].cost;
+        const upgradeCost = towerConfig.basic.ranks[this.rank].cost;
         let canAfford = false;
 
         // Check if player can afford upgrade
-        window.game.eventSystem.emit('canAffordUpgrade', { cost: upgradeCost, callback: (result) => {
-            canAfford = result;
-        }});
+        window.game.eventSystem.emit('checkGold', { 
+            amount: upgradeCost, 
+            callback: (result) => {
+                canAfford = result;
+            }
+        });
 
         if (!canAfford) return false;
 
@@ -139,24 +98,26 @@ export class Tower extends Entity {
 
         // Upgrade tower
         this.rank++;
-        const newConfig = towerConfig[this.type].ranks[this.rank-1];
+        const newConfig = towerConfig.basic.ranks[this.rank-1];
 
         // Update properties
         this.damage = newConfig.damage;
         this.attackSpeed = newConfig.attackSpeed;
         this.totalCost += upgradeCost;
 
-        // Update special properties
-        if (this.type === 'frost') {
-            this.slowAmount = newConfig.slowAmount;
-        } else if (this.type === 'fire') {
-            this.critChance = newConfig.critChance;
-            this.critMultiplier = newConfig.critMultiplier;
-        }
-
         // Update mesh
-        this.mesh = window.game.renderer.createTowerMesh(this.type, this.rank);
+        if (this.mesh) {
+            window.game.eventSystem.emit('removeFromScene', { object: this.mesh });
+        }
+        this.mesh = window.game.renderer.createTowerMesh(this.rank);
         this.mesh.position.copy(this.position);
+        window.game.eventSystem.emit('addToScene', { object: this.mesh });
+
+        // Update range indicator if visible
+        if (this.rangeIndicator) {
+            this.hideRangeIndicator();
+            this.showRangeIndicator();
+        }
 
         // Emit upgrade event
         window.game.eventSystem.emit('towerUpgraded', { tower: this });
@@ -171,6 +132,9 @@ export class Tower extends Entity {
         // Give gold to player
         window.game.eventSystem.emit('addGold', { amount: sellValue });
 
+        // Free tower slot
+        window.game.eventSystem.emit('freeTowerSlot', { slotIndex: this.slotIndex });
+
         // Emit sell event
         window.game.eventSystem.emit('towerSold', { tower: this, value: sellValue });
 
@@ -179,30 +143,24 @@ export class Tower extends Entity {
     }
 
     showRangeIndicator() {
-        if (!this.rangeIndicator) {
-            const geometry = new window['THREE'].RingGeometry(this.range - 0.1, this.range + 0.1, 32);
-            const material = new window['THREE'].MeshBasicMaterial({
-                color: 0x00ff00,
-                opacity: 0.3,
-                transparent: true,
-                side: window['THREE'].DoubleSide
-            });
-            this.rangeIndicator = new window['THREE'].Mesh(geometry, material);
-            this.rangeIndicator.rotation.x = -Math.PI / 2;
-            this.rangeIndicator.position.y = 0.1;
-            this.mesh.add(this.rangeIndicator);
-        }
+        if (this.rangeIndicator) return;
+        
+        this.rangeIndicator = window.game.renderer.createRangeIndicator(this.position, this.range);
+        window.game.eventSystem.emit('addToScene', { object: this.rangeIndicator });
     }
 
     hideRangeIndicator() {
         if (this.rangeIndicator) {
-            this.mesh.remove(this.rangeIndicator);
+            window.game.eventSystem.emit('removeFromScene', { object: this.rangeIndicator });
             this.rangeIndicator = null;
         }
     }
 
     getDistanceTo(position) {
-        return this.position.distanceTo(position);
+        // Calculate horizontal distance only (y/height is ignored)
+        const dx = this.position.x - position.x;
+        const dz = this.position.z - position.z;
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     destroy() {
@@ -210,4 +168,3 @@ export class Tower extends Entity {
         super.destroy();
     }
 }
-

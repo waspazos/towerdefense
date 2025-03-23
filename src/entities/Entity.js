@@ -10,6 +10,9 @@ export class Entity {
 
     update(delta) {
         // Base update method, override in child classes
+        if (this.mesh) {
+            this.mesh.position.copy(this.position);
+        }
     }
 
     destroy() {

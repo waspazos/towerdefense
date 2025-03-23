@@ -7,47 +7,39 @@ export const pathConfig = {
       description: "The primary path to the king",
       width: 2,
       visual: {
-        color: 0x8b4513,
+        color: 0xff0000,
         opacity: 0.8,
       },
-    },
-    side: {
-      name: "Side Path",
-      description: "Alternative path to the king",
-      width: 1.5,
-      visual: {
-        color: 0x8b4513,
-        opacity: 0.6,
-      },
-    },
+    }
   },
 
   // Path definitions
   paths: [
     {
       type: "main",
-      spawnPoint: { x: -20, y: 0, z: 0 },
+      spawnPoint: { x: -20, y: 0, z: -20 },
       waypoints: [
-        { x: -20, y: 0, z: 0 },
-        { x: -10, y: 0, z: 0 },
-        { x: 0, y: 0, z: 0 },
-        { x: 10, y: 0, z: 0 },
-        { x: 20, y: 0, z: 0 },
+        { x: -20, y: 0, z: -20 }, // Start
+        { x: 20, y: 0, z: -20 },  // Right
+        { x: 20, y: 0, z: -15 },  // Down
+        { x: -20, y: 0, z: -15 }, // Left
+        { x: -20, y: 0, z: -10 }, // Down
+        { x: 20, y: 0, z: -10 },  // Right
+        { x: 20, y: 0, z: -5 },   // Down
+        { x: -20, y: 0, z: -5 },  // Left
+        { x: -20, y: 0, z: 0 },   // Down
+        { x: 20, y: 0, z: 0 },    // Right
+        { x: 20, y: 0, z: 5 },    // Down
+        { x: -20, y: 0, z: 5 },   // Left
+        { x: -20, y: 0, z: 10 },  // Down
+        { x: 20, y: 0, z: 10 },   // Right
+        { x: 20, y: 0, z: 15 },   // Down
+        { x: -20, y: 0, z: 15 },  // Left
+        { x: -20, y: 0, z: 20 },  // Down
+        { x: 20, y: 0, z: 20 },   // Final stretch to king
       ],
-      endPoint: { x: 20, y: 0, z: 0 },
-    },
-    {
-      type: "side",
-      spawnPoint: { x: -20, y: 0, z: 10 },
-      waypoints: [
-        { x: -20, y: 0, z: 10 },
-        { x: -10, y: 0, z: 10 },
-        { x: 0, y: 0, z: 10 },
-        { x: 10, y: 0, z: 10 },
-        { x: 20, y: 0, z: 10 },
-      ],
-      endPoint: { x: 20, y: 0, z: 10 },
-    },
+      endPoint: { x: 20, y: 0, z: 20 },
+    }
   ],
 
   // Path visual effects
@@ -69,4 +61,9 @@ export const pathConfig = {
       opacity: 0.8,
     },
   },
+
+  // Initialize method to set up paths
+  initialize() {
+    console.log("PathConfig: Initialized");
+  }
 };

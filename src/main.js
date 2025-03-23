@@ -1,6 +1,5 @@
 import { Game } from "/src/Game.js";
 import { towerConfig } from "/src/config/towerConfig.js";
-import { augmentConfig } from "/src/config/augmentConfig.js";
 import { roundConfig } from "/src/config/roundConfig.js";
 import { creepConfig } from "/src/config/creepConfig.js";
 import { pathConfig } from "/src/config/pathConfig.js";
@@ -11,7 +10,6 @@ window.addEventListener("load", async () => {
   
   // Make key configs globally available
   window.towerConfig = towerConfig;
-  window.augmentConfig = augmentConfig;
   window.roundConfig = roundConfig;
   window.creepConfig = creepConfig;
   window.pathConfig = pathConfig;

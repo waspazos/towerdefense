@@ -1,5 +1,5 @@
 import { creepConfig } from '/src/config/creepConfig.js';
-import {Entity} from "/src/entities/Entity.js";
+import { Entity } from "/src/entities/Entity.js";
 
 export class Creep extends Entity {
   constructor(type, pathIndex, difficulty = 1) {
@@ -37,16 +37,10 @@ export class Creep extends Entity {
     this.health = creepTypeDef.baseStats.health * healthScale;
     this.maxHealth = this.health;
     this.speed = creepTypeDef.baseStats.speed * speedScale;
-    this.baseSpeed = this.speed;
     this.goldValue = Math.floor(creepTypeDef.baseStats.goldValue * goldScale);
     this.damageToKing = creepTypeDef.baseStats.damageToKing;
     this.progress = 0; // 0 to 1 for path progress
     this.reachedKing = false;
-
-    // Effects
-    this.slowEffects = [];
-    this.burnEffect = null;
-    this.slowEffectVisual = null;
 
     // Create health bar
     this.createHealthBar();
@@ -84,12 +78,6 @@ export class Creep extends Entity {
 
     // Skip if reached the end
     if (this.reachedKing) return;
-
-    // Update slow effects
-    this.updateSlowEffects(delta);
-
-    // Update burn effect
-    this.updateBurnEffect(delta);
 
     // Move along path
     this.moveAlongPath(delta);
@@ -143,14 +131,13 @@ export class Creep extends Entity {
     }
   }
 
-  takeDamage(amount, damageType = 'normal') {
+  takeDamage(amount) {
     this.health -= amount;
 
     // Create floating damage number
     window.game.eventSystem.emit('createFloatingDamage', {
       position: this.position.clone(),
-      damage: amount,
-      isCritical: damageType === 'critical'
+      damage: amount
     });
 
     // Check if dead
@@ -189,127 +176,7 @@ export class Creep extends Entity {
     }
   }
 
-  applySlowEffect(amount, duration = 5.0, source = 1) {
-    // Add slow effect
-    this.slowEffects.push({
-      amount: amount,
-      remainingTime: duration,
-      source: source
-    });
-
-    // Update speed
-    this.updateSpeed();
-
-    // Add visual effect if not already present
-    if (this.slowEffects.length > 0 && !this.slowEffectVisual) {
-      this.addSlowVisualEffect();
-    }
-  }
-
-  updateSlowEffects(delta) {
-    let needsUpdate = false;
-
-    // Update remaining time on all slow effects
-    for (let i = this.slowEffects.length - 1; i >= 0; i--) {
-      const effect = this.slowEffects[i];
-      effect.remainingTime -= delta;
-
-      // Remove expired effects
-      if (effect.remainingTime <= 0) {
-        this.slowEffects.splice(i, 1);
-        needsUpdate = true;
-      }
-    }
-
-    // Update creep speed if any effects were removed
-    if (needsUpdate) {
-      this.updateSpeed();
-    }
-  }
-
-  updateSpeed() {
-    // Reset to base speed
-    this.speed = this.baseSpeed;
-
-    // Find the strongest slow effect
-    let strongestSlowAmount = 0;
-
-    for (const effect of this.slowEffects) {
-      if (effect.amount > strongestSlowAmount) {
-        strongestSlowAmount = effect.amount;
-      }
-    }
-
-    // Apply the slow effect
-    if (strongestSlowAmount > 0) {
-      this.speed = this.baseSpeed * (1 - strongestSlowAmount);
-    }
-
-    // Remove visual effect if no longer slowed
-    if (this.slowEffects.length === 0 && this.slowEffectVisual) {
-      this.removeSlowVisualEffect();
-    }
-  }
-
-  addSlowVisualEffect() {
-    this.slowEffectVisual = window.game.renderer.createSlowEffect(this.mesh);
-  }
-
-  removeSlowVisualEffect() {
-    if (this.slowEffectVisual) {
-      window.game.renderer.removeSlowEffect(this.slowEffectVisual);
-      this.slowEffectVisual = null;
-    }
-  }
-
-  applyBurnEffect(damagePerSecond, duration = 5.0) {
-    this.burnEffect = {
-      damagePerSecond: damagePerSecond,
-      remainingTime: duration,
-      timeSinceLastTick: 0
-    };
-
-    // Add visual effect
-    this.addBurnVisualEffect();
-  }
-
-  updateBurnEffect(delta) {
-    if (!this.burnEffect) return;
-
-    // Update remaining time
-    this.burnEffect.remainingTime -= delta;
-    this.burnEffect.timeSinceLastTick += delta;
-
-    // Apply damage every second
-    if (this.burnEffect.timeSinceLastTick >= 1.0) {
-      this.takeDamage(this.burnEffect.damagePerSecond);
-      this.burnEffect.timeSinceLastTick = 0;
-    }
-
-    // Remove effect if expired
-    if (this.burnEffect.remainingTime <= 0) {
-      this.burnEffect = null;
-      this.removeBurnVisualEffect();
-    }
-  }
-
-  addBurnVisualEffect() {
-    this.burnEffectVisual = window.game.renderer.createBurnEffect(this.mesh);
-  }
-
-  removeBurnVisualEffect() {
-    if (this.burnEffectVisual) {
-      window.game.renderer.removeBurnEffect(this.burnEffectVisual);
-      this.burnEffectVisual = null;
-    }
-  }
-
   destroy() {
-    // Clean up effects
-    this.removeSlowVisualEffect();
-    this.removeBurnVisualEffect();
-
-    // Call parent destroy
     super.destroy();
   }
 }

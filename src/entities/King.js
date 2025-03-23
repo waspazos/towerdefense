@@ -1,4 +1,4 @@
-import { Entity } from '/src/entities/Entity';
+import { Entity } from '/src/entities/Entity.js';
 
 export class King extends Entity {
     constructor(position) {
@@ -70,6 +70,12 @@ export class King extends Entity {
             damage: amount
         });
 
+        // Update UI
+        window.game.eventSystem.emit('kingHealthChanged', {
+            health: this.health,
+            maxHealth: this.maxHealth
+        });
+
         // Check if dead
         if (this.health <= 0 && !this.isDead) {
             this.die();
@@ -90,12 +96,6 @@ export class King extends Entity {
     }
 
     destroy() {
-        if (this.healthBar) {
-            this.mesh.remove(this.healthBar);
-        }
-        if (this.healthBarBg) {
-            this.mesh.remove(this.healthBarBg);
-        }
         super.destroy();
     }
 }

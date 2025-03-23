@@ -1,5 +1,7 @@
 class HUD {
-  constructor() {
+  constructor(eventSystem) {
+    this.eventSystem = eventSystem;
+    
     // UI element references
     this.elements = {
       kingHealth: document.getElementById('king-health'),
@@ -16,8 +18,15 @@ class HUD {
     this.lastDPSUpdateTime = 0;
 
     // Register event listeners
-    window.game.eventSystem.on('damageDealt', this.handleDamageDealt.bind(this));
-    window.game.eventSystem.on('updateDPS', this.updateDPS.bind(this));
+    this.eventSystem.on('damageDealt', this.handleDamageDealt.bind(this));
+    this.eventSystem.on('updateDPS', this.updateDPS.bind(this));
+    this.eventSystem.on('goldChanged', this.updateGold.bind(this));
+    this.eventSystem.on('kingHealthChanged', this.updateKingHealth.bind(this));
+    this.eventSystem.on('towerCountChanged', this.updateTowerCount.bind(this));
+    this.eventSystem.on('roundStarted', this.updateRoundCounter.bind(this));
+    this.eventSystem.on('interRoundTimerUpdated', this.updateRoundTimer.bind(this));
+    
+    console.log("HUD: Initialized");
   }
 
   handleDamageDealt(data) {
@@ -35,35 +44,68 @@ class HUD {
       this.lastDPSUpdateTime = currentTime;
 
       if (this.elements.totalDamage) {
-        this.elements.totalDamage.textContent = Math.round(Number(this.currentDPS));
+        this.elements.totalDamage.textContent = Math.round(this.currentDPS);
       }
     }
   }
 
-  update() {
-    // Most UI updates are handled via events in UIManager
-    // This method is just for any frame-by-frame updates that might be needed
-
-    // Check if we need to get updated values
-    let kingHealth = 0;
-    window.game.eventSystem.emit('getKingHealth', {
-      callback: (value) => { kingHealth = value; }
-    });
-
-    let gold = 0;
-    window.game.eventSystem.emit('getGold', {
-      callback: (value) => { gold = value; }
-    });
-
-    // Update elements if needed (only if values changed)
-    if (this.lastKingHealth !== kingHealth && this.elements.kingHealth) {
-      this.elements.kingHealth.textContent = Math.max(0, Math.floor(Number(kingHealth)));
-      this.lastKingHealth = kingHealth;
-    }
-
-    if (this.lastGold !== gold && this.elements.gold) {
+  updateGold(data) {
+    const { gold } = data;
+    if (this.elements.gold) {
       this.elements.gold.textContent = gold;
-      this.lastGold = gold;
+    }
+  }
+
+  updateKingHealth(data) {
+    const { health, maxHealth } = data;
+    if (this.elements.kingHealth) {
+      this.elements.kingHealth.textContent = `${Math.max(0, Math.floor(health))}/${maxHealth}`;
+    }
+  }
+
+  updateTowerCount(data) {
+    const { count } = data;
+    if (this.elements.towerCount) {
+      this.elements.towerCount.textContent = count;
+    }
+  }
+
+  updateRoundCounter(data) {
+    const { roundNumber } = data;
+    if (this.elements.roundCounter) {
+      this.eventSystem.emit('getMaxRounds', { 
+        callback: (maxRounds) => {
+          this.elements.roundCounter.textContent = `Round: ${roundNumber}/${maxRounds}`;
+        }
+      });
+    }
+  }
+
+  updateRoundTimer(data) {
+    const { timer } = data;
+    if (this.elements.roundTimer) {
+      this.eventSystem.emit('isRoundActive', {
+        callback: (active) => {
+          if (active) {
+            this.elements.roundTimer.textContent = 'Round in progress';
+          } else {
+            const seconds = Math.max(0, Math.ceil(timer));
+            this.elements.roundTimer.textContent = `Next round in: ${seconds}s`;
+          }
+        }
+      });
+    }
+  }
+
+  reset() {
+    // Reset DPS calculation
+    this.damageInCurrentSecond = 0;
+    this.currentDPS = 0;
+    this.lastDPSUpdateTime = 0;
+    
+    // Update all UI elements
+    if (this.elements.totalDamage) {
+      this.elements.totalDamage.textContent = '0';
     }
   }
 }

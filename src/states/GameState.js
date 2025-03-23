@@ -1,7 +1,8 @@
 import { roundConfig } from "/src/config/roundConfig.js";
 
-class GameState {
-  constructor() {
+export class GameState {
+  constructor(eventSystem) {
+    this.eventSystem = eventSystem;
     this.kingHealth = 100;
     this.maxKingHealth = 100;
     this.currentRound = 0;
@@ -9,84 +10,47 @@ class GameState {
     this.gameActive = false;
     this.isPaused = false;
     this.interRoundTimer = roundConfig.interRoundTimer;
-    this.timerInterval = null;
     this.roundActive = false;
     this.towers = [];
     this.towerSlots = [];
     this.selectedTower = null;
     this.selectedTowerSlot = null;
-    this.workers = [];
-    this.gold = 100; // Initial gold amount
-    this.activeAugments = [];
 
     // Register event listeners
-    window.game.eventSystem.on(
-      "creepReachedEnd",
-      this.handleCreepReachedEnd.bind(this),
-    );
-    window.game.eventSystem.on(
-      "roundCompleted",
-      this.handleRoundCompleted.bind(this),
-    );
-    window.game.eventSystem.on(
-      "getCurrentRound",
-      this.handleGetCurrentRound.bind(this),
-    );
-    window.game.eventSystem.on(
-      "getAllTowers",
-      this.handleGetAllTowers.bind(this),
-    );
-    window.game.eventSystem.on(
-      "freeTowerSlot",
-      this.handleFreeTowerSlot.bind(this),
-    );
-    window.game.eventSystem.on(
-      "kingHealthChanged",
-      this.handleKingHealthChanged.bind(this),
-    );
-    window.game.eventSystem.on(
-      "towerSelected",
-      this.handleTowerSelected.bind(this),
-    );
-    window.game.eventSystem.on(
-      "towerSlotSelected",
-      this.handleTowerSlotSelected.bind(this),
-    );
-    window.game.eventSystem.on("towerBuilt", this.handleTowerBuilt.bind(this));
-    window.game.eventSystem.on("towerSold", this.handleTowerSold.bind(this));
-    window.game.eventSystem.on("escKeyPressed", this.togglePause.bind(this));
-
-    // Add missing event listeners
-    window.game.eventSystem.on("getGold", this.handleGetGold.bind(this));
-    window.game.eventSystem.on("getKingHealth", this.handleGetKingHealth.bind(this));
-    window.game.eventSystem.on("isRoundActive", this.handleIsRoundActive.bind(this));
-    window.game.eventSystem.on("getMaxRounds", this.handleGetMaxRounds.bind(this));
-    window.game.eventSystem.on("getActiveAugments", this.handleGetActiveAugments.bind(this));
-    window.game.eventSystem.on("getWorkers", this.handleGetWorkers.bind(this));
-    window.game.eventSystem.on("getTowerCount", this.handleGetTowerCount.bind(this));
-    window.game.eventSystem.on("getInterRoundTimer", this.handleGetInterRoundTimer.bind(this));
+    this.eventSystem.on("creepReachedEnd", this.handleCreepReachedEnd.bind(this));
+    this.eventSystem.on("roundCompleted", this.handleRoundCompleted.bind(this));
+    this.eventSystem.on("getCurrentRound", this.handleGetCurrentRound.bind(this));
+    this.eventSystem.on("getKingHealth", this.handleGetKingHealth.bind(this));
+    this.eventSystem.on("getMaxRounds", this.handleGetMaxRounds.bind(this));
+    this.eventSystem.on("getInterRoundTimer", this.handleGetInterRoundTimer.bind(this));
+    this.eventSystem.on("getAllTowers", this.handleGetAllTowers.bind(this));
+    this.eventSystem.on("getTowerCount", this.handleGetTowerCount.bind(this));
+    this.eventSystem.on("freeTowerSlot", this.handleFreeTowerSlot.bind(this));
+    this.eventSystem.on("kingHealthChanged", this.handleKingHealthChanged.bind(this));
+    this.eventSystem.on("towerSelected", this.handleTowerSelected.bind(this));
+    this.eventSystem.on("towerSlotSelected", this.handleTowerSlotSelected.bind(this));
+    this.eventSystem.on("towerBuilt", this.handleTowerBuilt.bind(this));
+    this.eventSystem.on("towerSold", this.handleTowerSold.bind(this));
+    this.eventSystem.on("escKeyPressed", this.togglePause.bind(this));
+    this.eventSystem.on("createTowerSlotMesh", this.handleCreateTowerSlotMesh.bind(this));
+    
+    console.log("GameState: Initialized");
   }
 
   async initialize() {
-    console.log('GameState: Initializing');
     this.reset();
     await this.createTowerSlots();
     this.gameActive = true;
     
-    // Ensure timer is properly initialized
-    console.log('GameState: Setting initial timer value:', roundConfig.interRoundTimer);
-    this.interRoundTimer = roundConfig.interRoundTimer;
-
     // Start first round with a delay to allow for scene setup
-    console.log('GameState: Setting up first round timer');
     setTimeout(() => {
-      console.log('GameState: Starting inter-round timer');
       this.startInterRoundTimer();
     }, 1000);
 
     // Emit game started event
-    console.log('GameState: Emitting gameStarted event');
-    window.game.eventSystem.emit("gameStarted");
+    this.eventSystem.emit("gameStarted");
+    
+    console.log("GameState: Game started");
   }
 
   reset() {
@@ -95,10 +59,8 @@ class GameState {
     this.currentRound = 0;
     this.gameActive = false;
     this.isPaused = false;
-    // Reset timer with validation
-    this.interRoundTimer = typeof roundConfig.interRoundTimer === 'number' ? roundConfig.interRoundTimer : 10;
+    this.interRoundTimer = roundConfig.interRoundTimer;
     this.roundActive = false;
-    this.gold = 100;
 
     // Clear towers
     this.towers.forEach((tower) => tower.destroy());
@@ -107,7 +69,7 @@ class GameState {
     // Clear tower slots
     this.towerSlots.forEach((slot) => {
       if (slot.mesh) {
-        window.game.eventSystem.emit("removeFromScene", { object: slot.mesh });
+        this.eventSystem.emit("removeFromScene", { object: slot.mesh });
       }
     });
     this.towerSlots = [];
@@ -116,161 +78,148 @@ class GameState {
     this.selectedTower = null;
     this.selectedTowerSlot = null;
 
-    // Clear workers
-    this.workers.forEach((worker) => worker.destroy());
-    this.workers = [];
-
-    // Clear any timers
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
-
     // Emit reset event for other systems
-    window.game.eventSystem.emit("reset");
+    this.eventSystem.emit("reset");
+    
+    console.log("GameState: Reset");
   }
 
   async createTowerSlots() {
     // Clear existing slots
     this.towerSlots.forEach((slot) => {
       if (slot.mesh) {
-        window.game.eventSystem.emit("removeFromScene", { object: slot.mesh });
+        this.eventSystem.emit("removeFromScene", { object: slot.mesh });
       }
     });
     this.towerSlots = [];
 
     // Create tower slots at exact coordinates
     const slotPositions = [
-      // Left path slots
-      { x: -20, z: -17.5 },
-      { x: -20, z: -7.5 },
-      { x: -20, z: 0 },
-      { x: -7.5, z: 7 },
-
-      // Center path slots
-      { x: -5, z: 0 },
-      { x: 5, z: 0 },
-      { x: -5, z: -7.5 },
-      { x: 5, z: -7.5 },
+      // Row 1 (top)
+      { x: -15, z: -17.5 },
       { x: -5, z: -17.5 },
       { x: 5, z: -17.5 },
+      { x: 15, z: -17.5 },
 
-      // Right path slots
-      { x: 7.5, z: 7 },
-      { x: 20, z: 0 },
-      { x: 20, z: -17.5 },
-      { x: 20, z: -7.5 },
+      // Row 2
+      { x: -15, z: -12.5 },
+      { x: -5, z: -12.5 },
+      { x: 5, z: -12.5 },
+      { x: 15, z: -12.5 },
+
+      // Row 3
+      { x: -15, z: -7.5 },
+      { x: -5, z: -7.5 },
+      { x: 5, z: -7.5 },
+      { x: 15, z: -7.5 },
+
+      // Row 4
+      { x: -15, z: -2.5 },
+      { x: -5, z: -2.5 },
+      { x: 5, z: -2.5 },
+      { x: 15, z: -2.5 },
+
+      // Row 5
+      { x: -15, z: 2.5 },
+      { x: -5, z: 2.5 },
+      { x: 5, z: 2.5 },
+      { x: 15, z: 2.5 },
+
+      // Row 6
+      { x: -15, z: 7.5 },
+      { x: -5, z: 7.5 },
+      { x: 5, z: 7.5 },
+      { x: 15, z: 7.5 },
+
+      // Row 7
+      { x: -15, z: 12.5 },
+      { x: -5, z: 12.5 },
+      { x: 5, z: 12.5 },
+      { x: 15, z: 12.5 },
+
+      // Row 8 (bottom)
+      { x: -15, z: 17.5 },
+      { x: -5, z: 17.5 },
+      { x: 5, z: 17.5 },
+      { x: 15, z: 17.5 },
     ];
 
-    const createSlots = async () => {
-      // Use a for...of loop instead of forEach to allow awaiting
-      for (const [index, position] of slotPositions.entries()) {
-        // Create a Promise to handle the async mesh creation
-        const slotMeshPromise = new Promise((resolve) => {
-          window.game.eventSystem.emit("createTowerSlotMesh", {
-            callback: (mesh) => {
-              resolve(mesh);
-            },
-          });
+    // Create slots
+    for (const [index, position] of slotPositions.entries()) {
+      // Create mesh for slot
+      let slotMesh = null;
+      await new Promise(resolve => {
+        this.eventSystem.emit("createTowerSlotMesh", {
+          callback: (mesh) => {
+            slotMesh = mesh;
+            resolve();
+          }
         });
+      });
+      
+      // Create slot object
+      const slot = {
+        index: index,
+        position: new window["THREE"].Vector3(position.x, 0.1, position.z),
+        occupied: false,
+        mesh: slotMesh,
+      };
 
-        // Wait for the mesh to be created
-        const slotMesh = await slotMeshPromise;
+      // Position the mesh
+      slot.mesh.position.copy(slot.position);
 
-        // Create slot object with the mesh we received
-        const slot = {
-          index: index,
-          position: new window["THREE"].Vector3(position.x, 0.1, position.z),
-          occupied: false,
-          mesh: slotMesh,
-        };
-
-        // Position the mesh
-        slot.mesh.position.copy(slot.position);
-
-        // Add to scene and game state
-        window.game.eventSystem.emit("addToScene", { object: slot.mesh });
-        this.towerSlots.push(slot);
-      }
-    };
-
-    // Call the async function
-    await createSlots();
+      // Add to scene and game state
+      this.eventSystem.emit("addToScene", { object: slot.mesh });
+      this.towerSlots.push(slot);
+    }
+    
+    console.log("GameState: Created", this.towerSlots.length, "tower slots");
+    return this.towerSlots;
   }
 
   update(delta) {
     // Update inter-round timer
-    if (!this.roundActive && !this.isPaused && this.timerInterval === null) {
-      // Ensure delta is a valid number
-      const validDelta = typeof delta === 'number' && !isNaN(delta) ? delta : 0;
-      
-      // Store previous timer value
-      const previousTimer = typeof this.interRoundTimer === 'number' ? this.interRoundTimer : roundConfig.interRoundTimer;
-      
-      // Calculate new timer value
-      this.interRoundTimer = Math.max(0, previousTimer - validDelta);
-      
-      console.log('GameState: Timer update', {
-        previousTimer,
-        validDelta,
-        newTimer: this.interRoundTimer,
-        roundActive: this.roundActive,
-        isPaused: this.isPaused
-      });
+    if (!this.roundActive && !this.isPaused && this.gameActive && this.interRoundTimer > 0) {
+      this.interRoundTimer -= delta;
 
       if (this.interRoundTimer <= 0) {
-        console.log('GameState: Timer expired, starting round');
         this.startRound();
       }
 
-      // Only emit timer update if the value has changed and is valid
-      if (previousTimer !== this.interRoundTimer && !isNaN(this.interRoundTimer)) {
-        window.game.eventSystem.emit("interRoundTimerUpdated", {
-          timer: this.interRoundTimer
-        });
-      }
+      // Emit timer update event
+      this.eventSystem.emit("interRoundTimerUpdated", {
+        timer: Math.max(0, this.interRoundTimer)
+      });
     }
+
+    // Update all towers
+    this.towers.forEach(tower => tower.update(delta));
   }
 
   startInterRoundTimer() {
-    console.log('GameState: startInterRoundTimer called');
-    // Reset timer with validation
-    const initialTimer = typeof roundConfig.interRoundTimer === 'number' ? roundConfig.interRoundTimer : 10;
-    this.interRoundTimer = initialTimer;
-    console.log('GameState: Timer reset to:', this.interRoundTimer);
+    // Reset timer
+    this.interRoundTimer = roundConfig.interRoundTimer;
 
-    // Clear any existing timer
-    if (this.timerInterval) {
-      clearInterval(this.timerInterval);
-      this.timerInterval = null;
-    }
-
-    // Emit timer update event with validation
-    console.log('GameState: Emitting interRoundTimerUpdated event with timer:', this.interRoundTimer);
-    window.game.eventSystem.emit("interRoundTimerUpdated", {
+    // Emit timer update event
+    this.eventSystem.emit("interRoundTimerUpdated", {
       timer: this.interRoundTimer
     });
+    
+    console.log("GameState: Inter-round timer started, duration:", this.interRoundTimer);
   }
 
   startRound() {
-    console.log('GameState: startRound called', {
-      roundActive: this.roundActive,
-      gameActive: this.gameActive
-    });
-    
-    if (this.roundActive || !this.gameActive) {
-      console.log('GameState: Cannot start round - game inactive or round already active');
-      return;
-    }
+    if (this.roundActive || !this.gameActive) return;
 
     this.currentRound++;
     this.roundActive = true;
 
     // Tell pathing system to start the round
-    console.log('GameState: Emitting startRound event');
-    window.game.eventSystem.emit("startRound", {
-      roundNumber: this.currentRound,
+    this.eventSystem.emit("startRound", {
+      roundNumber: this.currentRound
     });
+    
+    console.log("GameState: Starting round", this.currentRound);
   }
 
   handleRoundCompleted(data) {
@@ -284,6 +233,8 @@ class GameState {
 
     // Start inter-round timer
     this.startInterRoundTimer();
+    
+    console.log("GameState: Round", this.currentRound, "completed");
   }
 
   handleCreepReachedEnd(data) {
@@ -291,29 +242,43 @@ class GameState {
     this.kingHealth -= damageToKing;
 
     // Emit king health changed event
-    window.game.eventSystem.emit("kingHealthChanged", {
+    this.eventSystem.emit("kingHealthChanged", {
       health: this.kingHealth,
-      maxHealth: this.maxKingHealth,
+      maxHealth: this.maxKingHealth
     });
 
     // Check for game over
     if (this.kingHealth <= 0) {
       this.gameOver();
     }
+    
+    console.log("GameState: King took damage, health:", this.kingHealth);
   }
 
   gameOver() {
     this.gameActive = false;
 
     // Emit game over event
-    window.game.eventSystem.emit("gameOver", { victory: false });
+    this.eventSystem.emit("gameOver", { 
+      victory: false,
+      finalScore: this.currentRound * 100,
+      roundsSurvived: this.currentRound 
+    });
+    
+    console.log("GameState: Game over");
   }
 
   gameVictory() {
     this.gameActive = false;
 
     // Emit game victory event
-    window.game.eventSystem.emit("gameOver", { victory: true });
+    this.eventSystem.emit("gameOver", { 
+      victory: true,
+      finalScore: this.currentRound * 100 + this.kingHealth,
+      roundsSurvived: this.currentRound 
+    });
+    
+    console.log("GameState: Victory!");
   }
 
   togglePause() {
@@ -322,23 +287,19 @@ class GameState {
     this.isPaused = !this.isPaused;
 
     if (this.isPaused) {
-      // Store current time when paused
-      this.pauseStartTime = Date.now();
-
       // Emit pause event
-      window.game.eventSystem.emit("pause");
+      this.eventSystem.emit("pause");
     } else {
-      // Calculate pause duration
-      const pauseDuration = Date.now() - this.pauseStartTime;
-
       // Emit resume event
-      window.game.eventSystem.emit("resume", { pauseDuration });
+      this.eventSystem.emit("resume");
     }
 
     // Emit pause state changed event
-    window.game.eventSystem.emit("pauseStateChanged", {
-      isPaused: this.isPaused,
+    this.eventSystem.emit("pauseStateChanged", {
+      isPaused: this.isPaused
     });
+    
+    console.log("GameState: Pause toggled, isPaused:", this.isPaused);
   }
 
   handleKingHealthChanged(data) {
@@ -359,7 +320,7 @@ class GameState {
       this.selectedTower.hideRangeIndicator();
     }
     if (this.selectedTowerSlot) {
-      window.game.eventSystem.emit("hideTowerSlotRangeIndicator");
+      this.eventSystem.emit("hideTowerSlotRangeIndicator");
       this.selectedTowerSlot = null;
     }
 
@@ -370,7 +331,7 @@ class GameState {
     }
 
     // Emit selected tower changed event
-    window.game.eventSystem.emit("selectedTowerChanged", { tower });
+    this.eventSystem.emit("selectedTowerChanged", { tower });
   }
 
   handleTowerSlotSelected(data) {
@@ -382,19 +343,19 @@ class GameState {
       this.selectedTower = null;
     }
     if (this.selectedTowerSlot) {
-      window.game.eventSystem.emit("hideTowerSlotRangeIndicator");
+      this.eventSystem.emit("hideTowerSlotRangeIndicator");
     }
 
     // Select new slot
     this.selectedTowerSlot = slot;
     if (slot) {
-      window.game.eventSystem.emit("showTowerSlotRangeIndicator", {
-        position: slot.position,
+      this.eventSystem.emit("showTowerSlotRangeIndicator", {
+        position: slot.position
       });
     }
 
     // Emit selected slot changed event
-    window.game.eventSystem.emit("selectedTowerSlotChanged", { slot });
+    this.eventSystem.emit("selectedTowerSlotChanged", { slot });
   }
 
   handleTowerBuilt(data) {
@@ -413,9 +374,11 @@ class GameState {
     this.selectedTowerSlot = null;
 
     // Emit tower count changed event
-    window.game.eventSystem.emit("towerCountChanged", {
-      count: this.towers.length,
+    this.eventSystem.emit("towerCountChanged", {
+      count: this.towers.length
     });
+    
+    console.log("GameState: Tower built at slot", slotIndex);
   }
 
   handleTowerSold(data) {
@@ -427,16 +390,21 @@ class GameState {
       this.towers.splice(index, 1);
     }
 
+    // Free up the slot
+    this.eventSystem.emit("freeTowerSlot", { slotIndex: tower.slotIndex });
+
     // Deselect if this was the selected tower
     if (this.selectedTower === tower) {
       this.selectedTower = null;
-      window.game.eventSystem.emit("selectedTowerChanged", { tower: null });
+      this.eventSystem.emit("selectedTowerChanged", { tower: null });
     }
 
     // Emit tower count changed event
-    window.game.eventSystem.emit("towerCountChanged", {
-      count: this.towers.length,
+    this.eventSystem.emit("towerCountChanged", {
+      count: this.towers.length
     });
+    
+    console.log("GameState: Tower sold at slot", tower.slotIndex);
   }
 
   handleFreeTowerSlot(data) {
@@ -455,6 +423,27 @@ class GameState {
       callback(this.currentRound);
     }
   }
+  
+  handleGetKingHealth(data) {
+    const { callback } = data;
+    if (callback) {
+      callback(this.kingHealth, this.maxKingHealth);
+    }
+  }
+  
+  handleGetMaxRounds(data) {
+    const { callback } = data;
+    if (callback) {
+      callback(this.maxRounds);
+    }
+  }
+  
+  handleGetInterRoundTimer(data) {
+    const { callback } = data;
+    if (callback) {
+      callback(Math.max(0, this.interRoundTimer));
+    }
+  }
 
   handleGetAllTowers(data) {
     const { callback } = data;
@@ -462,69 +451,19 @@ class GameState {
       callback(this.towers);
     }
   }
-
-  // Add new event handlers
-  handleGetGold(data) {
-    const { callback } = data;
-    if (callback) {
-      callback(this.gold);
-    }
-  }
-
-  handleGetKingHealth(data) {
-    const { callback } = data;
-    if (callback) {
-      callback({
-        current: this.kingHealth,
-        max: this.maxKingHealth
-      });
-    }
-  }
-
-  handleIsRoundActive(data) {
-    const { callback } = data;
-    if (callback) {
-      callback(this.roundActive);
-    }
-  }
-
-  handleGetMaxRounds(data) {
-    const { callback } = data;
-    if (callback) {
-      callback(this.maxRounds);
-    }
-  }
-
-  handleGetActiveAugments(data) {
-    const { callback } = data;
-    if (callback) {
-      callback(this.activeAugments);
-    }
-  }
-
-  handleGetWorkers(data) {
-    const { callback } = data;
-    if (callback) {
-      callback(this.workers);
-    }
-  }
-
+  
   handleGetTowerCount(data) {
     const { callback } = data;
     if (callback) {
       callback(this.towers.length);
     }
   }
-
-  handleGetInterRoundTimer(data) {
-    console.log('GameState: Getting inter-round timer:', this.interRoundTimer);
+  
+  handleCreateTowerSlotMesh(data) {
     const { callback } = data;
     if (callback) {
-      const timerValue = Math.max(0, this.interRoundTimer || 0);
-      console.log('GameState: Returning timer value:', timerValue);
-      callback(timerValue);
+      const mesh = window.game.renderer.createTowerSlotMesh();
+      callback(mesh);
     }
   }
 }
-
-export default GameState;

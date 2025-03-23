@@ -42,19 +42,6 @@ body {
     user-select: none;
 }
 
-#worker-camp {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 2;
-    padding: 10px;
-    color: white;
-    background-color: rgba(0, 0, 0, 0.7);
-    border-bottom-right-radius: 10px;
-    user-select: none;
-    width: 200px;
-}
-
 #game-stats {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -110,7 +97,7 @@ body {
     border-radius: 10px;
     z-index: 3;
     color: white;
-    width: 600px;
+    width: 240px;
     display: flex;
     gap: 15px;
     justify-content: center;
@@ -119,7 +106,6 @@ body {
 
 .tower-options {
     display: flex;
-    gap: 15px;
     justify-content: center;
 }
 
@@ -148,45 +134,8 @@ body {
     position: relative;
 }
 
-.tower-icon.fire-tower {
-    background: linear-gradient(135deg, #ff4500, #ff0000);
-    box-shadow: 0 0 15px rgba(255, 69, 0, 0.5);
-}
-
-.tower-icon.fire-tower::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 60%;
-    height: 60%;
-    background: radial-gradient(circle, #ff8c00, transparent 70%);
-    border-radius: 50%;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0.8;
-    }
-    50% {
-        transform: translate(-50%, -50%) scale(1.2);
-        opacity: 0.6;
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0.8;
-    }
-}
-
 .tower-icon.basic-tower {
     background-color: #aaa;
-}
-
-.frost-tower {
-    background-color: #6495ED;
 }
 
 .tower-info {
@@ -237,6 +186,7 @@ body {
     height: 38px;
     border-radius: 50%;
     margin-right: 6px;
+    background-color: #aaa;
 }
 
 #tower-details-info {
@@ -249,13 +199,9 @@ body {
     margin-bottom: 3px;
 }
 
-#tower-details-damage, #tower-details-speed, #tower-details-rank, #tower-details-special {
+#tower-details-damage, #tower-details-speed, #tower-details-rank {
     font-size: 0.85em;
     margin-bottom: 1px;
-}
-
-#tower-details-special {
-    color: #add8e6; /* Light blue for frost effect */
 }
 
 #tower-actions-buttons {
@@ -283,6 +229,11 @@ body {
 
 #upgrade-tower:hover {
     background-color: #388e3c;
+}
+
+#upgrade-tower:disabled {
+    background-color: #777;
+    cursor: not-allowed;
 }
 
 #sell-tower {
@@ -446,16 +397,6 @@ body {
     opacity: 1;
 }
 
-/* Remove specific styling for other states */
-.round-item.previous,
-.round-item.next,
-.round-item.future {
-    /* Remove any special styling */
-    background-color: rgba(255, 255, 255, 0.1);
-    opacity: 0.7;
-    border-left: none;
-}
-
 /* When a round is active, keep its details visible */
 .round-item.active .round-details {
     color: #fff; /* Make text fully visible */
@@ -470,293 +411,12 @@ body {
     color: #ccc;
 }
 
-/* Augment Modal Styles */
-.augment-content {
-    background-color: rgba(0, 0, 0, 0.9);
-    padding: 30px;
-    border-radius: 15px;
-    width: 800px;
-    max-width: 90vw;
-    color: white;
+/* Affordable/unaffordable tower options */
+.tower-option.affordable {
+    border-color: rgba(76, 175, 80, 0.5);
 }
 
-.augment-content h2 {
-    text-align: center;
-    margin-bottom: 30px;
-    color: #ffd700;
-    font-size: 2em;
-    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-.augment-options {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-}
-
-.augment-option {
-    background-color: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    padding: 15px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-
-.augment-option:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.augment-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    margin-bottom: 15px;
-    position: relative;
-}
-
-.rage-icon {
-    background: linear-gradient(135deg, #ff4500, #ff0000);
-    box-shadow: 0 0 20px rgba(255, 69, 0, 0.5);
-}
-
-.catapult-icon {
-    background: linear-gradient(135deg, #8b4513, #654321);
-    box-shadow: 0 0 20px rgba(139, 69, 19, 0.5);
-}
-
-.bloodbath-icon {
-    background: linear-gradient(135deg, #800000, #ff0000);
-    box-shadow: 0 0 20px rgba(128, 0, 0, 0.5);
-}
-
-.hellfire-icon {
-    background: linear-gradient(135deg, #ff8c00, #ff4500);
-    box-shadow: 0 0 20px rgba(255, 140, 0, 0.5);
-}
-
-.golden-icon {
-    background: linear-gradient(135deg, #ffd700, #daa520);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-}
-
-.augment-info {
-    width: 100%;
-}
-
-.augment-name {
-    font-size: 1.2em;
-    font-weight: bold;
-    margin-bottom: 8px;
-    color: #ffd700;
-}
-
-.augment-description {
-    font-size: 0.9em;
-    color: rgba(255, 255, 255, 0.8);
-    line-height: 1.4;
-}
-
-/* Augment Tracker Styles */
-#augment-tracker {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    background-color: rgba(0, 0, 0, 0.8);
-    border-radius: 10px;
-    padding: 12px;
-    color: white;
-    user-select: none;
-    z-index: 3;
-    width: 250px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    transition: opacity 0.3s ease;
-}
-
-.augment-tracker-header {
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 10px;
-    font-size: 1.1em;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    padding-bottom: 5px;
-    color: #ffd700;
-}
-
-.augment-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.augment-item {
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, 0.1);
-    transition: all 0.3s ease;
-}
-
-.augment-item:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-.augment-icon-small {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin-right: 10px;
-}
-
-.augment-info-small {
-    flex: 1;
-}
-
-.augment-name-small {
-    font-size: 0.9em;
-    font-weight: bold;
-    color: #ffd700;
-}
-
-.augment-description-small {
-    font-size: 0.8em;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-/* Small Augment Icons for Tracker */
-.rage-icon-small {
-    background: linear-gradient(135deg, #ff4500, #ff0000);
-    box-shadow: 0 0 10px rgba(255, 69, 0, 0.5);
-}
-
-.catapult-icon-small {
-    background: linear-gradient(135deg, #8b4513, #654321);
-    box-shadow: 0 0 10px rgba(139, 69, 19, 0.5);
-}
-
-.bloodbath-icon-small {
-    background: linear-gradient(135deg, #800000, #ff0000);
-    box-shadow: 0 0 10px rgba(128, 0, 0, 0.5);
-}
-
-.hellfire-icon-small {
-    background: linear-gradient(135deg, #ff8c00, #ff4500);
-    box-shadow: 0 0 10px rgba(255, 140, 0, 0.5);
-}
-
-.golden-towers-icon-small {
-    background: linear-gradient(135deg, #ffd700, #daa520);
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-}
-
-.worker-camp-header {
-    font-size: 1.2em;
-    font-weight: bold;
-    margin-bottom: 10px;
-    text-align: center;
-    color: #ffd700;
-}
-
-.worker-list {
-    margin-bottom: 10px;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.worker-count {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    margin-bottom: 10px;
-}
-
-.worker-icon {
-    width: 30px;
-    height: 30px;
-    background-color: #4169E1;
-    border-radius: 50%;
-    margin-right: 10px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.worker-icon::before {
-    content: '';
-    position: absolute;
-    width: 15px;
-    height: 15px;
-    background-color: #FFD700;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-}
-
-.worker-count-text {
-    font-size: 1.2em;
-    font-weight: bold;
-    color: #FFD700;
-}
-
-.worker-item {
-    display: flex;
-    align-items: center;
-    padding: 5px;
-    background-color: rgba(255, 255, 255, 0.1);
-    margin-bottom: 5px;
-    border-radius: 4px;
-}
-
-.worker-info {
-    flex-grow: 1;
-}
-
-.worker-name {
-    font-size: 0.9em;
-    margin-bottom: 2px;
-}
-
-.worker-status {
-    font-size: 0.8em;
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.buy-worker-btn {
-    width: 100%;
-    padding: 8px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: background-color 0.2s;
-}
-
-.buy-worker-btn:hover {
-    background-color: #45a049;
-}
-
-.buy-worker-btn:disabled {
-    background-color: #cccccc;
+.tower-option.unaffordable {
+    opacity: 0.5;
     cursor: not-allowed;
-}
-
-.worker-message {
-    text-align: center;
-    padding: 10px;
-    color: #ffd700;
-    font-style: italic;
-    background-color: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
-    margin: 5px 0;
 }

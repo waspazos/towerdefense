@@ -5,6 +5,7 @@ export class InputManager {
     this.raycaster = new window['THREE'].Raycaster();
     this.mouse = new window['THREE'].Vector2();
     this.isInitialized = false;
+    console.log("InputManager: Initialized");
   }
 
   initialize() {
@@ -20,6 +21,7 @@ export class InputManager {
     document.addEventListener("keydown", this.handleKeyDown.bind(this));
 
     this.isInitialized = true;
+    console.log("InputManager: Event listeners attached");
   }
 
   handleCanvasClick(event) {
@@ -87,10 +89,5 @@ export class InputManager {
       ?.addEventListener("click", () => {
         this.eventSystem.emit("restartFromPauseClicked");
       });
-
-    // Buy worker button
-    document.getElementById("buy-worker")?.addEventListener("click", () => {
-      this.eventSystem.emit("buyWorkerClicked");
-    });
   }
 }
