@@ -40,15 +40,27 @@ export class PlayingState {
         .map((slot) => slot.mesh),
     );
 
-    // Check for existing tower hits
+    // Check for existing tower hits - include all meshes in the scene
     const towerIntersects = raycaster.intersectObjects(
-      window.game.gameState.towers.map((tower) => tower.mesh),
+      window.game.gameState.towers.map((tower) => tower.mesh).flatMap(group => {
+        return [group, ...group.children];
+      }),
+      true // Enable recursive search through child meshes
     );
 
     // Clear selections if clicking on empty space
     if (towerSlotIntersects.length === 0 && towerIntersects.length === 0) {
+      // Clear tower selection and hide its range indicator
+      if (window.game.gameState.selectedTower) {
+        window.game.gameState.selectedTower.hideRangeIndicator();
+      }
       this.eventSystem.emit("towerSelected", { tower: null });
+
+      // Clear tower slot selection and hide its range indicator
+      this.hideTowerSlotRangeIndicator();
       this.eventSystem.emit("towerSlotSelected", { slot: null });
+
+      // Hide UI elements
       this.eventSystem.emit("hideUI", { type: "towerActions" });
       this.eventSystem.emit("hideUI", { type: "towerSelection" });
       return;
@@ -56,6 +68,12 @@ export class PlayingState {
 
     // Handle tower slot selection
     if (towerSlotIntersects.length > 0) {
+      // Clear any existing tower selection and its range indicator
+      if (window.game.gameState.selectedTower) {
+        window.game.gameState.selectedTower.hideRangeIndicator();
+        this.eventSystem.emit("towerSelected", { tower: null });
+      }
+
       const slotMesh = towerSlotIntersects[0].object;
       const slot = window.game.gameState.towerSlots.find((s) => s.mesh === slotMesh);
       if (slot && !slot.occupied) {
@@ -67,11 +85,29 @@ export class PlayingState {
 
     // Handle tower selection
     if (towerIntersects.length > 0) {
-      const towerMesh = towerIntersects[0].object.parent || towerIntersects[0].object;
-      const tower = window.game.gameState.towers.find((t) => t.mesh === towerMesh);
-      if (tower) {
-        this.eventSystem.emit("towerSelected", { tower });
-        this.eventSystem.emit("showUI", { type: "towerActions", data: { tower } });
+      // Clear any existing tower slot selection and its range indicator
+      this.hideTowerSlotRangeIndicator();
+      this.eventSystem.emit("towerSlotSelected", { slot: null });
+
+      // Find the first intersected object that is part of a tower
+      const intersectedObject = towerIntersects[0].object;
+      
+      // Find the tower group by traversing up the parent hierarchy
+      let towerMesh = intersectedObject;
+      while (towerMesh && !towerMesh.userData.isTower) {
+        towerMesh = towerMesh.parent;
+      }
+
+      if (towerMesh) {
+        const tower = window.game.gameState.towers.find((t) => t.mesh === towerMesh);
+        if (tower) {
+          // Clear previous tower selection if different
+          if (window.game.gameState.selectedTower && window.game.gameState.selectedTower !== tower) {
+            window.game.gameState.selectedTower.hideRangeIndicator();
+          }
+          this.eventSystem.emit("towerSelected", { tower });
+          this.eventSystem.emit("showUI", { type: "towerActions", data: { tower } });
+        }
       }
     }
   }

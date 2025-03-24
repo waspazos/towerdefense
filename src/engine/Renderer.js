@@ -339,6 +339,7 @@ export class Renderer {
     base.position.y = 0.25;
     base.castShadow = true;
     base.receiveShadow = true;
+    base.userData.isPartOfTower = true;
     towerGroup.add(base);
     
     // Tower body
@@ -348,6 +349,7 @@ export class Renderer {
     body.position.y = 1.25;
     body.castShadow = true;
     body.receiveShadow = true;
+    body.userData.isPartOfTower = true;
     towerGroup.add(body);
     
     // Tower turret
@@ -358,6 +360,7 @@ export class Renderer {
     turret.rotation.x = Math.PI / 2;
     turret.castShadow = true;
     turret.receiveShadow = true;
+    turret.userData.isPartOfTower = true;
     towerGroup.add(turret);
     
     // Add rank indicator
@@ -366,8 +369,24 @@ export class Renderer {
       const stripeMaterial = new window['THREE'].MeshStandardMaterial({ color: 0xffd700 });
       const stripe = new window['THREE'].Mesh(stripeGeometry, stripeMaterial);
       stripe.position.set(0, 0.7 + (i * 0.2), 0.45);
+      stripe.userData.isPartOfTower = true;
       body.add(stripe);
     }
+
+    // Add click detection helper
+    const hitboxGeometry = new window['THREE'].BoxGeometry(1, 3, 1);
+    const hitboxMaterial = new window['THREE'].MeshBasicMaterial({ 
+      transparent: true, 
+      opacity: 0,
+      visible: false 
+    });
+    const hitbox = new window['THREE'].Mesh(hitboxGeometry, hitboxMaterial);
+    hitbox.position.y = 1.5;
+    hitbox.userData.isPartOfTower = true;
+    towerGroup.add(hitbox);
+    
+    // Mark the group itself
+    towerGroup.userData.isTower = true;
     
     return towerGroup;
   }
