@@ -24,6 +24,26 @@ export class UIManager {
     this.eventSystem.on('interRoundTimerUpdated', this.updateRoundTimer.bind(this));
     this.eventSystem.on('towerDetailsUpdated', this.updateTowerDetails.bind(this));
     this.eventSystem.on('gameStarted', this.handleGameStarted.bind(this));
+
+    // Add click handler for backdrop
+    this.elements.towerSelectionBackdrop.addEventListener('click', (event) => {
+      // Only hide if clicking directly on the backdrop (not its children)
+      if (event.target === this.elements.towerSelectionBackdrop) {
+        this.hideUI({ type: 'towerSelection' });
+        this.eventSystem.emit('cancelTowerPlacement');
+      }
+    });
+
+    // Add click handler for upgrade button
+    const upgradeButton = document.getElementById('upgrade-tower');
+    if (upgradeButton) {
+      upgradeButton.addEventListener('click', () => {
+        console.log("UIManager: Upgrade button clicked, emitting upgradeTowerClicked event");
+        this.eventSystem.emit('upgradeTowerClicked');
+      });
+    } else {
+      console.warn("UIManager: Upgrade button not found!");
+    }
     
     console.log("UIManager: Initialized");
   }
@@ -55,6 +75,7 @@ export class UIManager {
       return;
     }
 
+    console.log(`UIManager: Showing UI element "${type}" with data:`, uiData);
     this.elements[type].classList.remove('hidden');
 
     // Additional setup based on UI type
@@ -62,9 +83,13 @@ export class UIManager {
       case 'towerSelection':
         this.elements.towerSelectionBackdrop.classList.remove('hidden');
         this.updateTowerOptionsAvailability();
+        // Ensure backdrop is behind the selection modal but above the game
+        this.elements.towerSelectionBackdrop.style.zIndex = '2';
+        this.elements.towerSelection.style.zIndex = '3';
         break;
       case 'towerActions':
         if (uiData && uiData.tower) {
+          console.log("UIManager: Updating tower details for tower:", uiData.tower);
           this.updateTowerDetails({ tower: uiData.tower });
         }
         break;
@@ -295,31 +320,129 @@ export class UIManager {
     if (towerDetailsDamage) towerDetailsDamage.textContent = `Damage: ${tower.damage}`;
     if (towerDetailsSpeed) towerDetailsSpeed.textContent = `Attack Speed: ${tower.attackSpeed.toFixed(1)}s`;
 
-    // Upgrade button
+    // Get upgrade options for current rank
+    const currentRank = tower.rank;
+    const nextRank = tower.rank + 1;
+    const upgradeOptions = window.towerConfig.basic.ranks[currentRank]?.upgrades || [];
+    const upgradeOptionsContainer = document.querySelector('.upgrade-options-container');
+    const upgradeOptionsDiv = document.getElementById('upgrade-options');
+    const towerActions = document.getElementById('tower-actions');
+
+    console.log("UIManager: Current tower rank:", currentRank);
+    console.log("UIManager: Next rank:", nextRank);
+    console.log("UIManager: Available upgrade options:", upgradeOptions);
+
+    // Update upgrade button text and state
     const upgradeButton = document.getElementById('upgrade-tower');
     if (upgradeButton) {
-      if (tower.rank < 5) {
-        const upgradeCost = window.towerConfig.basic.ranks[tower.rank].cost;
-        upgradeButton.textContent = `Upgrade (${upgradeCost} Gold)`;
+        if (tower.rank >= 5) {
+            upgradeButton.textContent = 'MAX RANK';
+            upgradeButton.disabled = true;
+        } else {
+            upgradeButton.textContent = 'Choose Upgrade';
+            upgradeButton.disabled = false;
+        }
+    }
+
+    // Clear previous upgrade options
+    if (upgradeOptionsContainer) {
+        upgradeOptionsContainer.innerHTML = '';
+    }
+
+    // Show upgrade options if available
+    if (upgradeOptions.length > 0 && tower.rank < 5) {
+        console.log("UIManager: Showing upgrade options for tower rank", currentRank);
+        if (upgradeOptionsDiv) {
+            upgradeOptionsDiv.classList.remove('hidden');
+            console.log("UIManager: Upgrade options div shown");
+        }
+        if (towerActions) towerActions.classList.add('showing-upgrades');
+
+        // Get upgrade cost for current rank
+        const upgradeCost = window.towerConfig.basic.ranks[currentRank].cost;
         
         // Check if player can afford
         this.eventSystem.emit('checkGold', {
-          amount: upgradeCost,
-          callback: (canAfford) => {
-            upgradeButton.disabled = !canAfford;
-          }
+            amount: upgradeCost,
+            callback: (canAfford) => {
+                console.log("UIManager: Can afford upgrade:", canAfford);
+                // Create upgrade option elements
+                upgradeOptions.forEach((upgrade) => {
+                    // Skip if this upgrade is already selected
+                    if (tower.selectedUpgrades && tower.selectedUpgrades.includes(upgrade.id)) {
+                        return;
+                    }
+
+                    const optionElement = document.createElement('div');
+                    optionElement.className = 'upgrade-option';
+                    
+                    // Create the button structure
+                    optionElement.innerHTML = `
+                        <div class="upgrade-option-header">
+                            <div class="upgrade-option-name">${upgrade.name}</div>
+                            <div class="upgrade-option-cost">${upgradeCost} Gold</div>
+                        </div>
+                        <div class="upgrade-option-description">${upgrade.description}</div>
+                        <button class="upgrade-button" ${!canAfford ? 'disabled' : ''}>
+                            Select Upgrade
+                        </button>
+                    `;
+
+                    // Add click handler to the button
+                    const button = optionElement.querySelector('.upgrade-button');
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent event bubbling
+                        tower.selectedUpgrade = upgrade;
+                        if (!tower.selectedUpgrades) tower.selectedUpgrades = [];
+                        tower.selectedUpgrades.push(upgrade.id);
+                        this.eventSystem.emit('upgradeTower', { tower });
+                        // Hide the tower actions after upgrading
+                        this.hideUI({ type: 'towerActions' });
+                    });
+
+                    if (upgradeOptionsContainer) {
+                        upgradeOptionsContainer.appendChild(optionElement);
+                        console.log("UIManager: Added upgrade option:", upgrade.name);
+                    }
+                });
+
+                // Show selected upgrades at the bottom
+                if (tower.selectedUpgrades && tower.selectedUpgrades.length > 0) {
+                    const selectedUpgradesDiv = document.createElement('div');
+                    selectedUpgradesDiv.className = 'selected-upgrades';
+                    selectedUpgradesDiv.innerHTML = '<div class="selected-upgrades-title">Selected Upgrades:</div>';
+                    
+                    tower.selectedUpgrades.forEach(upgradeId => {
+                        const upgrade = window.towerConfig.basic.ranks
+                            .flatMap(rank => rank.upgrades || [])
+                            .find(u => u.id === upgradeId);
+                        
+                        if (upgrade) {
+                            const selectedUpgradeElement = document.createElement('div');
+                            selectedUpgradeElement.className = 'selected-upgrade';
+                            selectedUpgradeElement.textContent = upgrade.name;
+                            selectedUpgradesDiv.appendChild(selectedUpgradeElement);
+                        }
+                    });
+
+                    if (upgradeOptionsContainer) {
+                        upgradeOptionsContainer.appendChild(selectedUpgradesDiv);
+                    }
+                }
+            }
         });
-      } else {
-        upgradeButton.textContent = 'MAX RANK';
-        upgradeButton.disabled = true;
-      }
+    } else {
+        console.log("UIManager: No upgrade options available or tower at max rank");
+        // Hide upgrade options if none available
+        if (upgradeOptionsDiv) upgradeOptionsDiv.classList.add('hidden');
+        if (towerActions) towerActions.classList.remove('showing-upgrades');
     }
 
     // Sell button
     const sellButton = document.getElementById('sell-tower');
     if (sellButton) {
-      const sellValue = Math.floor(tower.totalCost * 0.5);
-      sellButton.textContent = `Sell (${sellValue} Gold)`;
+        const sellValue = Math.floor(tower.totalCost * 0.5);
+        sellButton.textContent = `Sell (${sellValue} Gold)`;
     }
   }
 

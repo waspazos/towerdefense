@@ -18,6 +18,12 @@ export class Tower extends Entity {
         this.attackTimer = 0;
         this.totalCost = config.cost;
 
+        // Upgrade tracking
+        this.selectedUpgrade = null;
+        this.upgrades = [];
+        this.shotCounter = 0;
+        this.multiShotCount = 0;
+
         // Range indicator (hidden by default)
         this.rangeIndicator = null;
     }
@@ -33,11 +39,34 @@ export class Tower extends Entity {
             const targets = this.findTargets();
 
             if (Array.isArray(targets) && targets.length > 0) {
-                // Basic tower can hit multiple targets
-                targets.forEach(target => {
+                // Get number of targets based on multi-shot ability
+                const targetCount = 1 + this.multiShotCount;
+                const validTargets = targets.slice(0, targetCount);
+
+                // Attack each valid target
+                validTargets.forEach(target => {
                     if (target) this.fireProjectile(target);
                 });
+
+                // Handle Forest Echoes upgrade (20% chance for extra shot)
+                if (this.hasUpgrade('forest_echoes')) {
+                    if (Math.random() < 0.2) {
+                        setTimeout(() => {
+                            validTargets.forEach(target => {
+                                if (target && target.health > 0) this.fireProjectile(target);
+                            });
+                        }, 200); // 0.2 second delay
+                    }
+                }
+
                 this.attackTimer = 0;
+                this.shotCounter++;
+
+                // Handle Sharpened Tools upgrade
+                if (this.hasUpgrade('sharpened_tools') && this.shotCounter >= 30) {
+                    this.shotCounter = 0;
+                    this.grantDamageBonus();
+                }
             }
         }
     }
@@ -66,18 +95,75 @@ export class Tower extends Entity {
     }
 
     fireProjectile(target) {
+        let damage = this.damage;
+
+        // Apply Night Witch effect
+        if (this.hasUpgrade('night_witch')) {
+            // Add percentage health damage
+            damage += target.maxHealth * 0.005;
+            // Apply slow effect
+            target.applySlowEffect(0.15, 1.0); // 15% slow for 1 second
+        }
+
+        // Calculate projectile spawn position (from turret)
+        const spawnPosition = this.position.clone();
+        spawnPosition.y += 2.25; // Height of the turret
+
+        // Calculate direction to target
+        const direction = new window['THREE'].Vector3()
+            .subVectors(target.position, spawnPosition)
+            .normalize();
+
+        // Rotate turret to face target
+        if (this.mesh) {
+            const turret = this.mesh.children.find(child => 
+                child.geometry instanceof window['THREE'].CylinderGeometry);
+            if (turret) {
+                const angle = Math.atan2(direction.x, direction.z);
+                turret.rotation.y = angle;
+            }
+        }
+
         // Create projectile via event system
         window.game.eventSystem.emit('createProjectile', {
-            position: this.position.clone(),
+            position: spawnPosition,
             target: target,
-            damage: this.damage,
+            damage: damage,
             tower: this
         });
+    }
+
+    hasUpgrade(upgradeId) {
+        return this.upgrades.some(upgrade => upgrade.id === upgradeId);
+    }
+
+    grantDamageBonus() {
+        // Get all towers
+        const towers = [];
+        window.game.eventSystem.emit('getAllTowers', {
+            callback: (allTowers) => {
+                towers.push(...allTowers);
+            }
+        });
+
+        // Filter to nearby towers (including self)
+        const nearbyTowers = towers.filter(tower => {
+            return this.position.distanceTo(tower.position) <= this.range;
+        });
+
+        if (nearbyTowers.length > 0) {
+            // Select random tower
+            const luckyTower = nearbyTowers[Math.floor(Math.random() * nearbyTowers.length)];
+            luckyTower.damage += 2;
+        }
     }
 
     upgrade() {
         // Check if max rank reached
         if (this.rank >= 5) return false;
+
+        // If no upgrade is selected, just return true to show options
+        if (!this.selectedUpgrade) return true;
 
         // Get upgrade cost
         const upgradeCost = towerConfig.basic.ranks[this.rank].cost;
@@ -95,6 +181,22 @@ export class Tower extends Entity {
 
         // Deduct cost
         window.game.eventSystem.emit('spendGold', { amount: upgradeCost });
+
+        // Store the selected upgrade
+        this.upgrades.push(this.selectedUpgrade);
+
+        // Handle Sky Talker upgrade
+        if (this.selectedUpgrade.id === 'sky_talker') {
+            this.multiShotCount = this.selectedUpgrade.effects.baseMultiShot;
+            // Listen for round completion to increase multi-shot
+            window.game.eventSystem.on('roundCompleted', () => {
+                if (this.roundsSinceLastShot >= 5) {
+                    this.multiShotCount++;
+                    this.roundsSinceLastShot = 0;
+                }
+                this.roundsSinceLastShot++;
+            });
+        }
 
         // Upgrade tower
         this.rank++;
@@ -118,6 +220,9 @@ export class Tower extends Entity {
             this.hideRangeIndicator();
             this.showRangeIndicator();
         }
+
+        // Reset selected upgrade
+        this.selectedUpgrade = null;
 
         // Emit upgrade event
         window.game.eventSystem.emit('towerUpgraded', { tower: this });

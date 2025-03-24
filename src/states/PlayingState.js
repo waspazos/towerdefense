@@ -10,6 +10,7 @@ export class PlayingState {
     this.eventSystem.on("canvasClick", this.handleCanvasClick.bind(this));
     this.eventSystem.on("towerOptionClicked", this.handleTowerOptionClicked.bind(this));
     this.eventSystem.on("upgradeTowerClicked", this.handleUpgradeTowerClicked.bind(this));
+    this.eventSystem.on("upgradeTower", this.handleUpgradeTower.bind(this));
     this.eventSystem.on("sellTowerClicked", this.handleSellTowerClicked.bind(this));
     this.eventSystem.on("cancelTowerActionClicked", this.handleCancelTowerActionClicked.bind(this));
     this.eventSystem.on("showTowerSlotRangeIndicator", this.showTowerSlotRangeIndicator.bind(this));
@@ -162,18 +163,32 @@ export class PlayingState {
   }
 
   handleUpgradeTowerClicked() {
-    if (!this.isActive || !window.game.gameState.selectedTower) return;
+    console.log("PlayingState: handleUpgradeTowerClicked called");
+    if (!this.isActive || !window.game.gameState.selectedTower) {
+      console.log("PlayingState: Cannot handle upgrade - game not active or no tower selected");
+      return;
+    }
 
-    // Upgrade the tower
-    const upgraded = window.game.gameState.selectedTower.upgrade();
+    // Get the selected tower
+    const tower = window.game.gameState.selectedTower;
+    console.log("PlayingState: Selected tower found, emitting towerDetailsUpdated event");
 
-    if (upgraded) {
-      // Update UI
-      this.eventSystem.emit("towerDetailsUpdated", {
-        tower: window.game.gameState.selectedTower,
-      });
-      
-      console.log("PlayingState: Tower upgraded to rank", window.game.gameState.selectedTower.rank);
+    // Show upgrade options
+    this.eventSystem.emit("towerDetailsUpdated", { tower });
+  }
+
+  handleUpgradeTower(data) {
+    if (!this.isActive || !data.tower) return;
+
+    const tower = data.tower;
+    
+    // Apply the upgrade (Tower class handles gold check and spending)
+    const success = tower.upgrade();
+    
+    if (success) {
+      console.log("PlayingState: Tower upgraded to rank", tower.rank);
+    } else {
+      console.log("PlayingState: Tower upgrade failed");
     }
   }
 

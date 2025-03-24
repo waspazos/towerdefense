@@ -36,11 +36,15 @@ export class Creep extends Entity {
     this.path = path;
     this.health = creepTypeDef.baseStats.health * healthScale;
     this.maxHealth = this.health;
-    this.speed = creepTypeDef.baseStats.speed * speedScale;
+    this.baseSpeed = creepTypeDef.baseStats.speed * speedScale; // Store base speed
+    this.speed = this.baseSpeed; // Current speed (can be modified by slow effects)
     this.goldValue = Math.floor(creepTypeDef.baseStats.goldValue * goldScale);
     this.damageToKing = creepTypeDef.baseStats.damageToKing;
     this.progress = 0; // 0 to 1 for path progress
     this.reachedKing = false;
+
+    // Slow effect tracking
+    this.slowEffects = [];
 
     // Create health bar
     this.createHealthBar();
@@ -79,11 +83,46 @@ export class Creep extends Entity {
     // Skip if reached the end
     if (this.reachedKing) return;
 
+    // Update slow effects
+    this.updateSlowEffects(delta);
+
     // Move along path
     this.moveAlongPath(delta);
 
     // Update health bar
     this.updateHealthBar();
+  }
+
+  updateSlowEffects(delta) {
+    // Update and remove expired slow effects
+    this.slowEffects = this.slowEffects.filter(effect => {
+      effect.duration -= delta;
+      return effect.duration > 0;
+    });
+
+    // Calculate total slow amount (effects stack additively)
+    let totalSlow = 0;
+    this.slowEffects.forEach(effect => {
+      totalSlow += effect.amount;
+    });
+
+    // Cap total slow at 90%
+    totalSlow = Math.min(0.9, totalSlow);
+
+    // Apply slow to speed
+    this.speed = this.baseSpeed * (1 - totalSlow);
+  }
+
+  applySlowEffect(amount, duration) {
+    // Add new slow effect
+    this.slowEffects.push({
+      amount: amount,
+      duration: duration
+    });
+
+    // Immediately update speed
+    let totalSlow = Math.min(0.9, this.slowEffects.reduce((sum, effect) => sum + effect.amount, 0));
+    this.speed = this.baseSpeed * (1 - totalSlow);
   }
 
   moveAlongPath(delta) {
@@ -102,17 +141,41 @@ export class Creep extends Entity {
     direction.subVectors(nextWaypoint, this.position).normalize();
 
     // Move in that direction
-    const distance = this.speed * delta;
-    this.position.add(direction.multiplyScalar(distance));
+    const moveDistance = this.speed * delta;
+    const movement = direction.clone().multiplyScalar(moveDistance);
+    this.position.add(movement);
 
     // Check if we reached the next waypoint
     const distanceToWaypoint = this.position.distanceTo(nextWaypoint);
-    if (distanceToWaypoint < 0.1) {
+    if (distanceToWaypoint < 0.25) {
+      // Snap to waypoint to prevent drift
+      this.position.copy(nextWaypoint);
       this.currentWaypointIndex++;
 
       // Calculate progress along path
       if (this.path.waypoints.length > 1) {
         this.progress = this.currentWaypointIndex / (this.path.waypoints.length - 1);
+      }
+    } else {
+      // Check if we're too far from the path
+      const pathDirection = new window['THREE'].Vector3().subVectors(nextWaypoint, currentWaypoint);
+      const pathLength = pathDirection.length();
+      const normalizedPathDir = pathDirection.clone().normalize();
+      
+      // Get vector from current waypoint to creep
+      const toCreep = new window['THREE'].Vector3().subVectors(this.position, currentWaypoint);
+      
+      // Project creep position onto path segment
+      const dot = toCreep.dot(normalizedPathDir);
+      const projectionAmount = Math.max(0, Math.min(dot, pathLength));
+      const projectedPoint = new window['THREE'].Vector3()
+        .copy(currentWaypoint)
+        .add(normalizedPathDir.multiplyScalar(projectionAmount));
+      
+      // If we're too far from the path, correct position
+      const distanceFromPath = this.position.distanceTo(projectedPoint);
+      if (distanceFromPath > 0.5) {
+        this.position.lerp(projectedPoint, 0.1);
       }
     }
   }
