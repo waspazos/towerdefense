@@ -9,7 +9,9 @@ export class UIManager {
       towerActions: document.getElementById('tower-actions'),
       gameOver: document.getElementById('game-over'),
       pauseMenu: document.getElementById('esc-menu'),
-      roundTracker: document.getElementById('round-tracker')
+      roundTracker: document.getElementById('round-tracker'),
+      factionSelection: document.getElementById('faction-selection'),
+      factionLoading: document.getElementById('faction-loading')
     };
     
     // Register event listeners
@@ -24,6 +26,10 @@ export class UIManager {
     this.eventSystem.on('interRoundTimerUpdated', this.updateRoundTimer.bind(this));
     this.eventSystem.on('towerDetailsUpdated', this.updateTowerDetails.bind(this));
     this.eventSystem.on('gameStarted', this.handleGameStarted.bind(this));
+    this.eventSystem.on('showLoadingState', this.showLoadingState.bind(this));
+    this.eventSystem.on('hideLoadingState', this.hideLoadingState.bind(this));
+    this.eventSystem.on('showFactionSelection', this.showFactionSelection.bind(this));
+    this.eventSystem.on('hideFactionSelection', this.hideFactionSelection.bind(this));
 
     // Add click handler for backdrop
     this.elements.towerSelectionBackdrop.addEventListener('click', (event) => {
@@ -45,6 +51,9 @@ export class UIManager {
       console.warn("UIManager: Upgrade button not found!");
     }
     
+    // Initialize faction selection
+    this.setupFactionSelection();
+    
     console.log("UIManager: Initialized");
   }
 
@@ -52,6 +61,9 @@ export class UIManager {
     // Initial UI setup
     this.updateRoundTracker();
     this.updateUI();
+
+    // Add event listeners for faction selection
+    this.setupFactionSelection();
     
     console.log("UIManager: UI elements initialized");
   }
@@ -67,13 +79,30 @@ export class UIManager {
     console.log("UIManager: Game started, UI reset");
   }
 
+  // Update the showUI method to handle faction selection
   showUI(data) {
     const { type, data: uiData } = data;
-
+  
     if (!this.elements[type]) {
       console.warn(`UIManager: Element "${type}" not found`);
       return;
     }
+  
+    // Handle modal layering - hide other modals first
+    if (type === 'factionSelection' || type === 'gameOver' || type === 'pauseMenu') {
+      // Hide other modals
+      ['factionSelection', 'gameOver', 'pauseMenu'].forEach(modalType => {
+        if (modalType !== type && this.elements[modalType]) {
+          this.elements[modalType].classList.add('hidden');
+        }
+      });
+      
+      // Ensure proper z-index
+      this.elements[type].style.zIndex = '999';
+    }
+    
+    // Show the requested UI element
+    this.elements[type].classList.remove('hidden');
 
     console.log(`UIManager: Showing UI element "${type}" with data:`, uiData);
     this.elements[type].classList.remove('hidden');
@@ -83,9 +112,8 @@ export class UIManager {
       case 'towerSelection':
         this.elements.towerSelectionBackdrop.classList.remove('hidden');
         this.updateTowerOptionsAvailability();
-        // Ensure backdrop is behind the selection modal but above the game
-        this.elements.towerSelectionBackdrop.style.zIndex = '2';
-        this.elements.towerSelection.style.zIndex = '3';
+        // Update tower options based on faction
+        this.updateTowerOptionsForFaction(window.game.selectedFaction);
         break;
       case 'towerActions':
         if (uiData && uiData.tower) {
@@ -96,11 +124,62 @@ export class UIManager {
       case 'gameOver':
         this.setupGameOverScreen(uiData);
         break;
+      case 'factionSelection':
+        // Make sure it's not hidden and visible on top
+        this.elements.factionSelection.style.zIndex = '999';
+        break;
     }
     
     console.log(`UIManager: Showing UI element "${type}"`);
   }
 
+    // Add this new method for updating tower options based on faction
+  updateTowerOptionsForFaction(faction) {
+    if (!faction) return;
+    
+    const towerOptions = document.querySelector('.tower-options');
+    if (!towerOptions) return;
+    
+    // Clear existing options
+    towerOptions.innerHTML = '';
+    
+    // Get faction tower config
+    const towerType = window.towerConfig[faction];
+    if (!towerType) return;
+    
+    // Create new option
+    const option = document.createElement('div');
+    option.className = 'tower-option';
+    option.setAttribute('data-type', faction);
+    
+    // Set faction colors
+    const factionColor = window.towerConfig.factions[faction].color;
+    const iconColor = faction === 'amazonians' ? '#2E8B57' : 
+                      faction === 'ironclad' ? '#708090' : 
+                      faction === 'arcanists' ? '#9370DB' : '#aaa';
+    
+    option.innerHTML = `
+      <div class="tower-icon ${faction}-tower" style="background-color: ${iconColor};"></div>
+      <div class="tower-info">
+        <div class="tower-name">${towerType.name}</div>
+        <div class="tower-cost">Cost: ${towerType.ranks[0].cost} Gold</div>
+        <div class="tower-stat">Damage: ${towerType.ranks[0].damage}</div>
+        <div class="tower-stat">Speed: ${towerType.ranks[0].attackSpeed}s</div>
+      </div>
+    `;
+    
+    towerOptions.appendChild(option);
+    
+    // Reattach event handler
+    option.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.eventSystem.emit('towerOptionClicked', { towerType: faction, event });
+    });
+    
+    // Update affordability
+    this.updateTowerOptionsAvailability();
+  }
+  
   hideUI(data) {
     const { type } = data;
 
@@ -465,6 +544,24 @@ export class UIManager {
     });
   }
 
+  // Add this new method
+  setupFactionSelection() {
+    const factionOptions = document.querySelectorAll('.faction-option');
+    
+    factionOptions.forEach(option => {
+      option.addEventListener('click', (event) => {
+        const faction = option.getAttribute('data-faction');
+        
+        // Highlight selected faction
+        factionOptions.forEach(opt => opt.classList.remove('selected'));
+        option.classList.add('selected');
+        
+        // Emit faction selection event
+        this.eventSystem.emit('selectFaction', { faction });
+      });
+    });
+  }
+
   setupGameOverScreen(data) {
     const { victory, finalScore, roundsSurvived } = data || {};
     
@@ -486,6 +583,34 @@ export class UIManager {
     const roundsElement = document.getElementById('rounds-survived');
     if (roundsElement && roundsSurvived !== undefined) {
       roundsElement.textContent = roundsSurvived;
+    }
+  }
+
+  showLoadingState(data) {
+    const { type } = data;
+    if (type === 'faction' && this.elements.factionLoading) {
+      this.elements.factionLoading.classList.remove('hidden');
+    }
+  }
+
+  hideLoadingState(data) {
+    const { type } = data;
+    if (type === 'faction' && this.elements.factionLoading) {
+      this.elements.factionLoading.classList.add('hidden');
+    }
+  }
+
+  showFactionSelection() {
+    if (this.elements.factionSelection) {
+      this.elements.factionSelection.classList.remove('hidden');
+      console.log("UIManager: Showing faction selection UI");
+    }
+  }
+
+  hideFactionSelection() {
+    if (this.elements.factionSelection) {
+      this.elements.factionSelection.classList.add('hidden');
+      console.log("UIManager: Hiding faction selection UI");
     }
   }
 }

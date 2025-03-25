@@ -119,7 +119,55 @@
                </div>
            </div>
        </div>
-   </div>
+       <!-- Add this inside the #game-container in index.html, right before the closing div -->
+<div id="faction-selection" class="modal">
+    <div class="modal-content faction-selection-content">
+        <h2>Choose Your Faction</h2>
+        <p>Select a faction to start the game. Each faction has unique towers and abilities.</p>
+        
+        <div class="faction-options">
+            <div class="faction-option" data-faction="amazonians">
+                <div class="faction-icon" style="background-color: #2E8B57;">🌿</div>
+                <div class="faction-info">
+                    <div class="faction-name">The Amazonians</div>
+                    <div class="faction-description">Jungle warriors who excel at rapid fire and multi-target attacks</div>
+                    <div class="faction-stats">
+                        <div>Starting Gold: 20</div>
+                        <div>Specialty: Multi-target attacks</div>
+                    </div>
+                </div>
+            </div>
+            <div class="faction-option" data-faction="ironclad">
+                <div class="faction-icon" style="background-color: #708090;">⚒️</div>
+                <div class="faction-info">
+                    <div class="faction-name">The Ironclad</div>
+                    <div class="faction-description">Masters of heavy artillery and defensive tactics</div>
+                    <div class="faction-stats">
+                        <div>Starting Gold: 25</div>
+                        <div>Specialty: Area damage and armor</div>
+                    </div>
+                </div>
+            </div>
+            <div class="faction-option" data-faction="arcanists">
+                <div class="faction-icon" style="background-color: #9370DB;">✨</div>
+                <div class="faction-info">
+                    <div class="faction-name">The Arcanist Order</div>
+                    <div class="faction-description">Mystics who harness magical energies for devastating effects</div>
+                    <div class="faction-stats">
+                        <div>Starting Gold: 15</div>
+                        <div>Specialty: Elemental damage and debuffs</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading indicator -->
+<div id="faction-loading" class="loading-indicator hidden">
+    <div class="spinner"></div>
+    <p>Initializing game...</p>    
+</div>
 
    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
    <script type="module" src="src/main.js"></script>

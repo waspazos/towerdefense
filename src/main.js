@@ -1,3 +1,4 @@
+// src/main.js
 import { Game } from "/src/Game.js";
 import { towerConfig } from "/src/config/towerConfig.js";
 import { roundConfig } from "/src/config/roundConfig.js";
@@ -17,7 +18,6 @@ window.addEventListener("load", async () => {
   // Create and initialize the game
   window.game = new Game();
   window.game.setup();
-  await window.game.initialize();
   
-  console.log("Game initialization complete");
+  console.log("Game setup complete, awaiting faction selection");
 });

@@ -150,6 +150,7 @@ export class GameState {
       let slotMesh = null;
       await new Promise(resolve => {
         this.eventSystem.emit("createTowerSlotMesh", {
+          position: position,
           callback: (mesh) => {
             slotMesh = mesh;
             resolve();
@@ -460,10 +461,15 @@ export class GameState {
   }
   
   handleCreateTowerSlotMesh(data) {
-    const { callback } = data;
+    const { position, callback } = data;
     if (callback) {
-      const mesh = window.game.renderer.createTowerSlotMesh();
-      callback(mesh);
+      // Get the renderer instance from the event system
+      this.eventSystem.emit("getRenderer", {
+        callback: (renderer) => {
+          const mesh = renderer.createTowerSlot(position);
+          callback(mesh);
+        }
+      });
     }
   }
 }

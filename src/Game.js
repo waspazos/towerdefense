@@ -1,3 +1,4 @@
+// src/Game.js
 import { EventSystem } from "/src/engine/EventSystem.js";
 import { InputManager } from "/src/engine/InputManager.js";
 import { Renderer } from "/src/engine/Renderer.js";
@@ -33,6 +34,7 @@ export class Game {
     this.isPaused = false;
     this.lastTime = 0;
     this.king = null;
+    this.selectedFaction = null; // New property for faction
     
     // Make config globally available
     window.towerConfig = towerConfig;
@@ -44,6 +46,8 @@ export class Game {
     this.eventSystem.on("restartGame", this.restart.bind(this));
     this.eventSystem.on("pause", this.pause.bind(this));
     this.eventSystem.on("resume", this.resume.bind(this));
+    this.eventSystem.on("selectFaction", this.selectFaction.bind(this)); // New event handler
+    this.eventSystem.on("getRenderer", this.handleGetRenderer.bind(this)); // New event handler
     
     console.log("Game: Constructed");
   }
@@ -59,6 +63,9 @@ export class Game {
     // Initialize input manager
     this.inputManager.initialize();
     this.inputManager.addDOMListeners();
+    
+    // Show faction selection UI
+    this.eventSystem.emit("showFactionSelection");
     
     console.log("Game: Setup complete");
   }
@@ -85,6 +92,30 @@ export class Game {
     requestAnimationFrame(this.gameLoop.bind(this));
     
     console.log("Game: Initialization complete");
+  }
+
+  selectFaction(data) {
+    const { faction } = data;
+    if (towerConfig.factions[faction]) {
+      // Show loading state
+      this.eventSystem.emit("showLoadingState", { type: "faction" });
+      
+      this.selectedFaction = faction;
+      console.log(`Game: Faction '${faction}' selected`);
+      
+      // Initialize economy with faction starting gold
+      const startingGold = towerConfig.factions[faction].startingGold || 20;
+      this.eventSystem.emit("initializeEconomy", { startingGold });
+      
+      // Continue with game initialization
+      setTimeout(async () => {
+        await this.initialize();
+        // Hide loading state after initialization
+        this.eventSystem.emit("hideLoadingState", { type: "faction" });
+        // Hide faction selection UI
+        this.eventSystem.emit("hideFactionSelection");
+      }, 300);
+    }
   }
 
   gameLoop(timestamp) {
@@ -134,14 +165,17 @@ export class Game {
   async restart() {
     console.log("Game: Restarting");
     
+    // Reset faction selection
+    this.selectedFaction = null;
+    
+    // Show faction selection screen
+    this.eventSystem.emit("showUI", { type: "factionSelection" });
+    
     // Reset game state
     await this.gameState.initialize();
     
     // Resume if paused
     this.isPaused = false;
-    
-    // Activate playing state
-    this.playingState.activate();
     
     console.log("Game: Restart complete");
   }
@@ -157,6 +191,13 @@ export class Game {
     const { object } = data;
     if (object) {
       this.renderer.scene.remove(object);
+    }
+  }
+
+  handleGetRenderer(data) {
+    const { callback } = data;
+    if (callback) {
+      callback(this.renderer);
     }
   }
 }

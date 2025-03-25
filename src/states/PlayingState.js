@@ -115,16 +115,19 @@ export class PlayingState {
 
   handleTowerOptionClicked(data) {
     if (!this.isActive) return;
-
+  
     const { towerType } = data;
-
+  
     if (!window.game.gameState.selectedTowerSlot) {
       return;
     }
-
+  
+    // Get faction
+    const faction = window.game.selectedFaction || 'amazonians';
+    
     // Get tower cost from tower config
-    const towerCost = window.towerConfig.basic.ranks[0].cost;
-
+    const towerCost = window.towerConfig[faction].ranks[0].cost;
+  
     // Check if player can afford
     let canAfford = false;
     this.eventSystem.emit("checkGold", {
@@ -133,28 +136,28 @@ export class PlayingState {
         canAfford = result;
       },
     });
-
+  
     if (!canAfford) {
       console.log(`Cannot afford tower: ${towerType}, cost: ${towerCost}`);
       return;
     }
-
+  
     // Store the selected slot index before we lose the reference
     const selectedSlotIndex = window.game.gameState.selectedTowerSlot.index;
     const selectedSlotPosition = window.game.gameState.selectedTowerSlot.position.clone();
-
+  
     // Deduct gold
     this.eventSystem.emit("spendGold", { amount: towerCost });
-
-    // Build tower
+  
+    // Build tower with faction type
     const tower = new Tower(selectedSlotPosition, selectedSlotIndex);
-
+  
     // Emit tower built event
     this.eventSystem.emit("towerBuilt", {
       tower,
       slotIndex: selectedSlotIndex,
     });
-
+  
     // Hide tower selection UI and clear selection
     this.eventSystem.emit("hideUI", { type: "towerSelection" });
     this.eventSystem.emit("towerSlotSelected", { slot: null });

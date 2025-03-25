@@ -89,5 +89,23 @@ export class InputManager {
       ?.addEventListener("click", () => {
         this.eventSystem.emit("restartFromPauseClicked");
       });
+      
+    // Faction selection
+    const factionOptions = document.querySelectorAll('.faction-option');
+    factionOptions.forEach((option) => {
+      const faction = option.getAttribute('data-faction');
+      option.addEventListener('click', (event) => {
+        // Clear any previous selections
+        document.querySelectorAll('.faction-option').forEach(opt => 
+          opt.classList.remove('selected')
+        );
+        
+        // Add selected class to this option
+        option.classList.add('selected');
+        
+        // Emit faction selection event
+        this.eventSystem.emit('selectFaction', { faction });
+      });
+    });
   }
 }

@@ -1,7 +1,8 @@
+// src/systems/EconomySystem.js
 export class EconomySystem {
   constructor(eventSystem) {
     this.eventSystem = eventSystem;
-    this.gold = 20; // Starting gold
+    this.gold = 20; // Default starting gold
     this.goldPerKill = 1;
 
     // Register event listeners
@@ -10,9 +11,19 @@ export class EconomySystem {
     this.eventSystem.on('addGold', this.addGold.bind(this));
     this.eventSystem.on('checkGold', this.checkGold.bind(this));
     this.eventSystem.on('getGold', this.handleGetGold.bind(this));
+    this.eventSystem.on('initializeEconomy', this.initializeEconomy.bind(this));
     this.eventSystem.on('reset', this.reset.bind(this));
     
     console.log("EconomySystem: Initialized with", this.gold, "gold");
+  }
+
+  initializeEconomy(data) {
+    const { startingGold } = data;
+    if (startingGold) {
+      this.gold = startingGold;
+      this.eventSystem.emit('goldChanged', { gold: this.gold });
+      console.log(`EconomySystem: Set starting gold to ${startingGold}`);
+    }
   }
 
   handleCreepKilled(data) {
@@ -52,6 +63,7 @@ export class EconomySystem {
   }
   
   reset() {
+    // Reset to default gold (will be overridden by faction selection)
     this.gold = 20;
     this.goldPerKill = 1;
     this.eventSystem.emit('goldChanged', { gold: this.gold });
