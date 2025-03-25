@@ -28,11 +28,12 @@ export class Renderer {
     this.scene.add(directionalLight);
 
     // Add ground plane
-    const groundGeometry = new window['THREE'].PlaneGeometry(50, 50);
+    const groundGeometry = new window['THREE'].PlaneGeometry(100, 100);
     const groundMaterial = new window['THREE'].MeshStandardMaterial({ 
-      color: 0x3a7e3a, // Forest green
-      roughness: 0.8,
-      metalness: 0.2
+      color: 0x2d5a27, // Darker, more natural grass green
+      roughness: 0.9, // Increased roughness for more natural look
+      metalness: 0.1, // Reduced metalness for more organic feel
+      flatShading: true // Enable flat shading for more natural grass appearance
     });
     const ground = new window['THREE'].Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -261,8 +262,8 @@ export class Renderer {
 
   render(delta = 0.016) {
     if (this.scene) {
-      this.updateHitEffects(delta);
-      this.updateFloatingDamage(delta);
+        this.updateHitEffects(delta);
+        this.updateFloatingDamage(delta);
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -310,8 +311,92 @@ export class Renderer {
     let bodyGeometry;
     
     if (faction === 'amazonians') {
-      // Slender, tall tower with a platform at the top
-      bodyGeometry = new window['THREE'].BoxGeometry(0.8, 1.5, 0.8);
+      // Create a raised wooden platform with supports
+      const platformGeometry = new window['THREE'].BoxGeometry(1.2, 0.2, 1.2);
+      const platformMaterial = new window['THREE'].MeshStandardMaterial({ 
+        color: 0x8b4513,
+        roughness: 0.8,
+        metalness: 0
+      });
+      const platform = new window['THREE'].Mesh(platformGeometry, platformMaterial);
+      platform.position.y = 2;
+      platform.castShadow = true;
+      platform.receiveShadow = true;
+      platform.userData.isPartOfTower = true;
+      towerGroup.add(platform);
+
+      // Add wooden supports
+      const supportGeometry = new window['THREE'].CylinderGeometry(0.1, 0.1, 2, 8);
+      const supportMaterial = new window['THREE'].MeshStandardMaterial({ 
+        color: 0x8b4513,
+        roughness: 0.8,
+        metalness: 0
+      });
+
+      // Add four supports at corners
+      const supportPositions = [
+        { x: 0.5, z: 0.5 },
+        { x: -0.5, z: 0.5 },
+        { x: 0.5, z: -0.5 },
+        { x: -0.5, z: -0.5 }
+      ];
+
+      supportPositions.forEach(pos => {
+        const support = new window['THREE'].Mesh(supportGeometry, supportMaterial);
+        support.position.set(pos.x, 1, pos.z);
+        support.castShadow = true;
+        support.receiveShadow = true;
+        support.userData.isPartOfTower = true;
+        towerGroup.add(support);
+      });
+
+      // Add thatched roof
+      const roofGeometry = new window['THREE'].ConeGeometry(0.8, 0.8, 8);
+      const roofMaterial = new window['THREE'].MeshStandardMaterial({ 
+        color: 0x8B4513,
+        roughness: 0.9,
+        metalness: 0
+      });
+      const roof = new window['THREE'].Mesh(roofGeometry, roofMaterial);
+      roof.position.y = 2.4;
+      roof.castShadow = true;
+      roof.receiveShadow = true;
+      roof.userData.isPartOfTower = true;
+      towerGroup.add(roof);
+
+      // Add wooden railing
+      const railingGeometry = new window['THREE'].BoxGeometry(1.4, 0.3, 0.1);
+      const railingMaterial = new window['THREE'].MeshStandardMaterial({ 
+        color: 0x8b4513,
+        roughness: 0.8,
+        metalness: 0
+      });
+      const railing = new window['THREE'].Mesh(railingGeometry, railingMaterial);
+      railing.position.y = 2.1;
+      railing.position.z = 0.6;
+      railing.castShadow = true;
+      railing.receiveShadow = true;
+      railing.userData.isPartOfTower = true;
+      towerGroup.add(railing);
+
+      // Add vines and leaves for decoration
+      const leavesGeometry = new window['THREE'].SphereGeometry(0.3, 8, 4);
+      const leavesMaterial = new window['THREE'].MeshStandardMaterial({ 
+        color: 0x228B22,
+        flatShading: true
+      });
+      const leaves = new window['THREE'].Mesh(leavesGeometry, leavesMaterial);
+      leaves.scale.set(1, 0.3, 1);
+      leaves.position.y = 2.2;
+      leaves.position.x = 0.4;
+      leaves.userData.isPartOfTower = true;
+      towerGroup.add(leaves);
+
+      // Add a second leaf cluster
+      const leaves2 = leaves.clone();
+      leaves2.position.x = -0.4;
+      leaves2.userData.isPartOfTower = true;
+      towerGroup.add(leaves2);
     } else if (faction === 'ironclad') {
       // Thick, sturdy tower with a wider base
       bodyGeometry = new window['THREE'].BoxGeometry(0.9, 1.3, 0.9);
