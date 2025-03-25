@@ -59,7 +59,7 @@ export class Renderer {
 
   createPath(paths) {
     // Create a path for each path configuration
-    paths.forEach(pathConfig => {
+    paths.forEach((pathConfig, index) => {
       // Create vertices array from waypoints
       const vertices = [];
       pathConfig.waypoints.forEach(waypoint => {
@@ -81,9 +81,119 @@ export class Renderer {
       path.userData.isPath = true;
       
       this.scene.add(path);
+
+      // Create cave at spawn point for the first path
+      if (index === 0) {
+        this.createCave(pathConfig.spawnPoint);
+      }
     });
     
     console.log("Renderer: Created paths");
+  }
+
+  createCave(spawnPoint) {
+    // Create stone wall with arch entrance
+    const wallWidth = 6;
+    const wallHeight = 4;
+    const archWidth = 2;
+    const archHeight = 3;
+    const wallDepth = 0.5;
+
+    // Create a group to hold all wall components
+    const wallGroup = new window['THREE'].Group();
+    this.scene.add(wallGroup);
+
+    // Create the main wall using brick-like material
+    const wallGeometry = new window['THREE'].BoxGeometry(wallWidth, wallHeight, wallDepth);
+    const wallMaterial = new window['THREE'].MeshStandardMaterial({ 
+      color: 0x8B8B83, // Stone gray
+      roughness: 1,
+      metalness: 0,
+      bumpScale: 1
+    });
+    const wall = new window['THREE'].Mesh(wallGeometry, wallMaterial);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    wallGroup.add(wall);
+
+    // Create the arch (using a torus for the curved part)
+    const archRadius = archWidth/2;
+    const archTubeRadius = 0.3;
+    const archGeometry = new window['THREE'].TorusGeometry(archRadius, archTubeRadius, 16, 32, Math.PI);
+    const archMaterial = new window['THREE'].MeshStandardMaterial({ 
+      color: 0x7B7B74, // Slightly darker stone
+      roughness: 1,
+      metalness: 0
+    });
+    const arch = new window['THREE'].Mesh(archGeometry, archMaterial);
+    arch.position.y = archHeight - archRadius;
+    arch.rotation.x = Math.PI/2;
+    arch.castShadow = true;
+    arch.receiveShadow = true;
+    wallGroup.add(arch);
+
+    // Create arch pillars
+    const pillarGeometry = new window['THREE'].BoxGeometry(0.4, archHeight, wallDepth);
+    const pillarMaterial = new window['THREE'].MeshStandardMaterial({ 
+      color: 0x7B7B74,
+      roughness: 1,
+      metalness: 0
+    });
+
+    // Left pillar
+    const leftPillar = new window['THREE'].Mesh(pillarGeometry, pillarMaterial);
+    leftPillar.position.set(-archWidth/2, archHeight/2, 0);
+    leftPillar.castShadow = true;
+    leftPillar.receiveShadow = true;
+    wallGroup.add(leftPillar);
+
+    // Right pillar
+    const rightPillar = new window['THREE'].Mesh(pillarGeometry, pillarMaterial);
+    rightPillar.position.set(archWidth/2, archHeight/2, 0);
+    rightPillar.castShadow = true;
+    rightPillar.receiveShadow = true;
+    wallGroup.add(rightPillar);
+
+    // Create dark entrance overlay
+    const entranceGeometry = new window['THREE'].PlaneGeometry(archWidth, archHeight);
+    const entranceMaterial = new window['THREE'].MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.7,
+      side: window['THREE'].DoubleSide
+    });
+    const entrance = new window['THREE'].Mesh(entranceGeometry, entranceMaterial);
+    entrance.position.y = archHeight/2;
+    entrance.position.z = -0.1;
+    wallGroup.add(entrance);
+
+    // Add some subtle particle effects for atmosphere
+    const particleCount = 20;
+    const particleGeometry = new window['THREE'].BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      particlePositions[i] = (Math.random() - 0.5) * archWidth;
+      particlePositions[i + 1] = Math.random() * archHeight;
+      particlePositions[i + 2] = 0;
+    }
+    
+    particleGeometry.setAttribute('position', new window['THREE'].BufferAttribute(particlePositions, 3));
+    
+    const particleMaterial = new window['THREE'].PointsMaterial({
+      color: 0x666666,
+      size: 0.03,
+      transparent: true,
+      opacity: 0.3
+    });
+    
+    const particles = new window['THREE'].Points(particleGeometry, particleMaterial);
+    wallGroup.add(particles);
+
+    // Position and rotate the entire wall group
+    wallGroup.position.set(spawnPoint.x, 0, spawnPoint.z);
+    // Rotate the wall to face the direction of the path (facing right)
+    wallGroup.rotation.y = -Math.PI/2;
   }
 
   createTowerSlot(position) {
