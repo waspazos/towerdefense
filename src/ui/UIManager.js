@@ -402,7 +402,8 @@ export class UIManager {
     // Get upgrade options for current rank
     const currentRank = tower.rank;
     const nextRank = tower.rank + 1;
-    const upgradeOptions = window.towerConfig.basic.ranks[currentRank]?.upgrades || [];
+    const faction = tower.type;
+    const upgradeOptions = window.towerConfig[faction].ranks[currentRank]?.upgrades || [];
     const upgradeOptionsContainer = document.querySelector('.upgrade-options-container');
     const upgradeOptionsDiv = document.getElementById('upgrade-options');
     const towerActions = document.getElementById('tower-actions');
@@ -438,7 +439,7 @@ export class UIManager {
         if (towerActions) towerActions.classList.add('showing-upgrades');
 
         // Get upgrade cost for current rank
-        const upgradeCost = window.towerConfig.basic.ranks[currentRank].cost;
+        const upgradeCost = window.towerConfig[faction].ranks[currentRank].cost;
         
         // Check if player can afford
         this.eventSystem.emit('checkGold', {
@@ -492,7 +493,7 @@ export class UIManager {
                     selectedUpgradesDiv.innerHTML = '<div class="selected-upgrades-title">Selected Upgrades:</div>';
                     
                     tower.selectedUpgrades.forEach(upgradeId => {
-                        const upgrade = window.towerConfig.basic.ranks
+                        const upgrade = window.towerConfig[faction].ranks
                             .flatMap(rank => rank.upgrades || [])
                             .find(u => u.id === upgradeId);
                         
@@ -520,8 +521,10 @@ export class UIManager {
     // Sell button
     const sellButton = document.getElementById('sell-tower');
     if (sellButton) {
-        const sellValue = Math.floor(tower.totalCost * 0.5);
-        sellButton.textContent = `Sell (${sellValue} Gold)`;
+        sellButton.addEventListener('click', () => {
+            this.eventSystem.emit('sellTower', { tower });
+            this.hideUI({ type: 'towerActions' });
+        });
     }
   }
 

@@ -15,14 +15,14 @@ export class Projectile extends Entity {
         this.damage = damage;
         this.tower = tower;
         this.type = projectileType;
-        this.speed = 20;
+        this.speed = 25; // Increased base speed
         this.hasReachedTarget = false;
         
         // Faction-specific projectile properties
         if (projectileType.includes('ironclad')) {
-            this.speed = 15; // Slower but heavier projectiles
+            this.speed = 25; // Increased from 15 to 25 for ironclad
         } else if (projectileType.includes('arcanists')) {
-            this.speed = 25; // Faster magical projectiles
+            this.speed = 35; // Increased from 25 to 35 for arcanists
         }
     }
 
@@ -31,8 +31,8 @@ export class Projectile extends Entity {
 
         if (this.hasReachedTarget) return;
 
-        // Check if target still exists
-        if (!this.target || !this.target.position) {
+        // Check if target still exists and is valid
+        if (!this.target || !this.target.position || !this.target.health || this.target.health <= 0) {
             this.destroy();
             return;
         }
@@ -54,6 +54,12 @@ export class Projectile extends Entity {
 
     hitTarget() {
         if (this.hasReachedTarget) return;
+
+        // Double check target is still valid
+        if (!this.target || !this.target.position || !this.target.health || this.target.health <= 0) {
+            this.destroy();
+            return;
+        }
 
         this.hasReachedTarget = true;
 
