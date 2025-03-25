@@ -57,7 +57,11 @@ export class Renderer {
       // Create vertices array from waypoints
       const vertices = [];
       pathConfig.waypoints.forEach(waypoint => {
-        vertices.push(waypoint.x, waypoint.y, waypoint.z);
+        // Ensure all coordinates are valid numbers
+        const x = Number(waypoint.x) || 0;
+        const y = Number(waypoint.y) || 0;
+        const z = Number(waypoint.z) || 0;
+        vertices.push(x, y, z);
       });
 
       // Create geometry
@@ -140,6 +144,9 @@ export class Renderer {
   }
 
   render() {
+    if (this.scene) {
+      this.updateHitEffects(0.016); // Assuming 60fps
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -400,14 +407,31 @@ export class Renderer {
   }
 
   createRangeIndicator(radius) {
+    // Ensure radius is a valid number
+    const validRadius = Number(radius) || 1;
+    
     const segments = 32;
-    const circleGeometry = new window['THREE'].RingGeometry(radius - 0.1, radius + 0.1, segments);
+    const circleGeometry = new window['THREE'].RingGeometry(
+      validRadius - 0.1,
+      validRadius + 0.1,
+      segments
+    );
+    
+    // Ensure all vertices are valid numbers
+    const position = circleGeometry.attributes.position;
+    const vertices = position.array;
+    for (let i = 0; i < vertices.length; i++) {
+      vertices[i] = Number(vertices[i]) || 0;
+    }
+    position.needsUpdate = true;
+    
     const circleMaterial = new window['THREE'].MeshBasicMaterial({ 
       color: 0x00ff00,
       transparent: true,
       opacity: 0.5,
       side: window['THREE'].DoubleSide
     });
+    
     const rangeIndicator = new window['THREE'].Mesh(circleGeometry, circleMaterial);
     rangeIndicator.rotation.x = -Math.PI / 2;
     rangeIndicator.userData.isRangeIndicator = true;
@@ -470,9 +494,9 @@ export class Renderer {
     
     switch(type) {
       case 'amazonians':
-        // Create a burst of leaves
-        for (let i = 0; i < 8; i++) {
-          const leafGeometry = new window['THREE'].SphereGeometry(0.1, 4, 4);
+        // Create a small burst of leaves
+        for (let i = 0; i < 4; i++) {
+          const leafGeometry = new window['THREE'].SphereGeometry(0.05, 4, 4);
           const leafMaterial = new window['THREE'].MeshStandardMaterial({ 
             color: 0x228B22,
             transparent: true,
@@ -481,25 +505,25 @@ export class Renderer {
           const leaf = new window['THREE'].Mesh(leafGeometry, leafMaterial);
           leaf.position.copy(position);
           
-          // Random direction for each leaf
-          const angle = (i / 8) * Math.PI * 2;
-          const radius = 0.5;
+          // Smaller spread for leaves
+          const angle = (i / 4) * Math.PI * 2;
+          const radius = 0.2;
           leaf.userData.velocity = new window['THREE'].Vector3(
             Math.cos(angle) * radius,
-            0.2,
+            0.1,
             Math.sin(angle) * radius
           );
-          leaf.userData.lifetime = 1.0;
-          leaf.userData.fadeSpeed = 0.8;
+          leaf.userData.lifetime = 0.5;
+          leaf.userData.fadeSpeed = 1.0;
           
           effectGroup.add(leaf);
         }
         break;
         
       case 'ironclad':
-        // Create a burst of sparks
-        for (let i = 0; i < 12; i++) {
-          const sparkGeometry = new window['THREE'].SphereGeometry(0.05, 4, 4);
+        // Create a small burst of sparks
+        for (let i = 0; i < 6; i++) {
+          const sparkGeometry = new window['THREE'].SphereGeometry(0.03, 4, 4);
           const sparkMaterial = new window['THREE'].MeshStandardMaterial({ 
             color: 0xffd700,
             emissive: 0xffd700,
@@ -508,15 +532,15 @@ export class Renderer {
           const spark = new window['THREE'].Mesh(sparkGeometry, sparkMaterial);
           spark.position.copy(position);
           
-          // Random direction for each spark
-          const angle = (i / 12) * Math.PI * 2;
-          const radius = 0.3;
+          // Smaller spread for sparks
+          const angle = (i / 6) * Math.PI * 2;
+          const radius = 0.15;
           spark.userData.velocity = new window['THREE'].Vector3(
             Math.cos(angle) * radius,
-            0.1,
+            0.05,
             Math.sin(angle) * radius
           );
-          spark.userData.lifetime = 0.5;
+          spark.userData.lifetime = 0.3;
           spark.userData.fadeSpeed = 1.0;
           
           effectGroup.add(spark);
@@ -524,8 +548,8 @@ export class Renderer {
         break;
         
       case 'arcanists':
-        // Create a magical burst
-        const burstGeometry = new window['THREE'].SphereGeometry(0.3, 8, 8);
+        // Create a small magical burst
+        const burstGeometry = new window['THREE'].SphereGeometry(0.15, 8, 8);
         const burstMaterial = new window['THREE'].MeshStandardMaterial({ 
           color: 0x9370DB,
           transparent: true,
@@ -535,16 +559,16 @@ export class Renderer {
         });
         const burst = new window['THREE'].Mesh(burstGeometry, burstMaterial);
         burst.position.copy(position);
-        burst.userData.lifetime = 0.8;
-        burst.userData.fadeSpeed = 0.8;
-        burst.userData.scaleSpeed = 1.5;
+        burst.userData.lifetime = 0.4;
+        burst.userData.fadeSpeed = 1.0;
+        burst.userData.scaleSpeed = 1.0;
         
         effectGroup.add(burst);
         break;
         
       default:
         // Default hit effect
-        const defaultGeometry = new window['THREE'].SphereGeometry(0.2, 8, 8);
+        const defaultGeometry = new window['THREE'].SphereGeometry(0.1, 8, 8);
         const defaultMaterial = new window['THREE'].MeshStandardMaterial({ 
           color: 0xffff00,
           transparent: true,
@@ -552,7 +576,7 @@ export class Renderer {
         });
         const defaultEffect = new window['THREE'].Mesh(defaultGeometry, defaultMaterial);
         defaultEffect.position.copy(position);
-        defaultEffect.userData.lifetime = 0.5;
+        defaultEffect.userData.lifetime = 0.3;
         defaultEffect.userData.fadeSpeed = 1.0;
         
         effectGroup.add(defaultEffect);
@@ -560,10 +584,13 @@ export class Renderer {
     
     effectGroup.userData.isHitEffect = true;
     effectGroup.userData.type = type;
+    effectGroup.userData.lifetime = 0.5; // Shorter maximum lifetime
     this.scene.add(effectGroup);
     
     // Update the effect in the render loop
     const updateEffect = (delta) => {
+      effectGroup.userData.lifetime -= delta;
+      
       effectGroup.children.forEach(child => {
         if (child.userData.velocity) {
           child.position.add(child.userData.velocity);
@@ -582,7 +609,8 @@ export class Renderer {
         }
       });
       
-      if (effectGroup.children.length === 0) {
+      // Remove the entire effect group when its lifetime is up
+      if (effectGroup.userData.lifetime <= 0 || effectGroup.children.length === 0) {
         this.scene.remove(effectGroup);
       }
     };
@@ -591,5 +619,27 @@ export class Renderer {
     effectGroup.userData.update = updateEffect;
     
     return effectGroup;
+  }
+
+  // Add this method to update hit effects
+  updateHitEffects(delta) {
+    if (!this.scene) return;
+    
+    // Create a copy of the scene's children to avoid modification during traversal
+    const children = [...this.scene.children];
+    
+    children.forEach(object => {
+      if (object.userData.isHitEffect && object.userData.update) {
+        try {
+          object.userData.update(delta);
+        } catch (error) {
+          console.warn('Error updating hit effect:', error);
+          // Remove the effect if there's an error
+          if (object.parent) {
+            object.parent.remove(object);
+          }
+        }
+      }
+    });
   }
 }
