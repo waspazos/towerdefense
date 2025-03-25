@@ -659,13 +659,16 @@ export class Renderer {
     canvas.width = 128;
     canvas.height = 128;
     
-    // Set up text style - 15% smaller
-    context.font = isCritical ? 'bold 102px Arial' : '68px Arial';
-    context.fillStyle = '#FFFFFF';
+    // Set up text style
+    context.font = isCritical ? 'bold 117px Arial' : 'bold 78px Arial'; // Both bold for better visibility
+    context.fillStyle = isCritical ? '#FF0000' : '#FFFFFF'; // Red for critical, white for normal
+    context.strokeStyle = '#000000'; // Black outline for better contrast
+    context.lineWidth = 4; // Thick outline
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Draw text
+    // Draw text with outline for better visibility
+    context.strokeText(damage.toString(), 64, 64);
     context.fillText(damage.toString(), 64, 64);
     
     // Create texture from canvas
@@ -676,73 +679,80 @@ export class Renderer {
       opacity: 1
     });
     
-    // Create a simple plane geometry
-    const geometry = new window['THREE'].PlaneGeometry(2.5, 2.5);
+    // Create a simple plane geometry (15% larger)
+    const geometry = new window['THREE'].PlaneGeometry(1.15, 1.15);
     
     // Create mesh
     const mesh = new window['THREE'].Mesh(geometry, material);
-    mesh.position.copy(position);
-    mesh.position.y += 0.5;
     
-    // Make the mesh always face the camera
-    mesh.lookAt(this.camera.position);
+    // Position at damage location
+    const startPosition = position.clone();
+    startPosition.y += 1.5; // Start above the creep's head
+    mesh.position.copy(startPosition);
+    
+    // Store camera reference
+    const camera = this.camera;
+    
+    // Make the mesh always face the camera (if available)
+    if (camera) {
+      mesh.lookAt(camera.position);
+    }
     
     // Add to scene
     this.scene.add(mesh);
     
     // Animation properties
-    mesh.userData.lifetime = 1.0;
-    mesh.userData.velocity = new window['THREE'].Vector3(0, 0.5, 0);
-    mesh.userData.fadeSpeed = 1.0;
-    mesh.userData.isFloatingDamage = true;
-    mesh.userData.maxHeight = position.y + 1.0;
-    mesh.userData.initialY = position.y + 0.5;
-    
-    // Update function for animation
-    const updateDamage = (delta) => {
-      mesh.userData.lifetime -= delta;
-      
-      // Update position with height limit
-      const currentHeight = mesh.position.y - mesh.userData.initialY;
-      if (currentHeight < 1.0) {
-        mesh.position.y += mesh.userData.velocity.y * delta;
-      }
-      
-      // Make the mesh always face the camera
-      mesh.lookAt(this.camera.position);
-      
-      // Fade out
-      mesh.material.opacity = mesh.userData.lifetime * mesh.userData.fadeSpeed;
-      
-      // Remove when done
-      if (mesh.userData.lifetime <= 0) {
-        this.scene.remove(mesh);
-      }
-    };
-    
-    // Store update function
-    mesh.userData.update = updateDamage;
-  }
-
-  // Add method to update floating damage
-  updateFloatingDamage(delta) {
-    if (!this.scene) return;
-    
-    // Create a copy of the scene's children to avoid modification during traversal
-    const children = [...this.scene.children];
-    
-    children.forEach(object => {
-      if (object.userData.isFloatingDamage && object.userData.update) {
-        try {
-          object.userData.update(delta);
-        } catch (error) {
-          console.warn('Error updating floating damage:', error);
-          // Remove the text if there's an error
-          if (object.parent) {
-            object.parent.remove(object);
-          }
+    mesh.userData = {
+      lifetime: 1.0,
+      velocity: new window['THREE'].Vector3(0, 1.5, 0), // Faster upward movement
+      fadeSpeed: 1.0,
+      isFloatingDamage: true,
+      initialPosition: startPosition.clone(),
+      camera: camera, // Store camera reference in userData
+      update: function(delta) {
+        // Update lifetime
+        this.lifetime -= delta;
+        
+        // Move upward
+        mesh.position.y += this.velocity.y * delta;
+        
+        // Always face camera (if reference exists)
+        if (this.camera) {
+          mesh.lookAt(this.camera.position);
+        }
+        
+        // Fade out
+        mesh.material.opacity = this.lifetime;
+        
+        // Remove when done
+        if (this.lifetime <= 0) {
+          if (mesh.parent) mesh.parent.remove(mesh);
         }
       }
-    });
+    };
+}
+
+  updateFloatingDamage(delta) {
+      if (!this.scene) return;
+      
+      // Create a copy to avoid modification during iteration
+      const children = [...this.scene.children];
+      
+      // Find all floating damage objects and update them
+      children.forEach(object => {
+        if (object.userData && object.userData.isFloatingDamage) {
+          try {
+            if (object.userData.update) {
+              object.userData.update(delta);
+            }
+          } catch (error) {
+            console.warn('Error updating floating damage:', error);
+            // Remove the object if there's an error
+            if (object.parent) {
+              object.parent.remove(object);
+            }
+          }
+        }
+      });
   }
 }
