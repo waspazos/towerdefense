@@ -63,9 +63,12 @@ export class Projectile extends Entity {
 
         this.hasReachedTarget = true;
 
+        // Check if this is a critical hit
+        const isCritical = this.type === 'ironclad_critical' || this.type === 'arcanists_powered';
+
         // Apply damage to target
         if (this.target.takeDamage) {
-            this.target.takeDamage(this.damage);
+            this.target.takeDamage(this.damage, isCritical);
         }
 
         // Create hit effect based on faction

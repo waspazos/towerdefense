@@ -18,7 +18,7 @@ export class Game {
   constructor() {
     // Game systems
     this.eventSystem = new EventSystem();
-    this.renderer = new Renderer();
+    this.renderer = new Renderer(this.eventSystem);
     this.inputManager = new InputManager(this.eventSystem, this.renderer);
     this.gameState = new GameState(this.eventSystem);
     this.menuState = new MenuState(this.eventSystem);
@@ -128,8 +128,8 @@ export class Game {
       this.update(delta);
     }
     
-    // Always render
-    this.render();
+    // Always render with the same delta time
+    this.render(delta);
     
     // Continue game loop
     requestAnimationFrame(this.gameLoop.bind(this));
@@ -148,8 +148,9 @@ export class Game {
     });
   }
 
-  render() {
-    this.renderer.render();
+  render(delta) {
+    // Render with the provided delta time
+    this.renderer.render(delta);
   }
 
   pause() {

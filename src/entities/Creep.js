@@ -194,13 +194,14 @@ export class Creep extends Entity {
     }
   }
 
-  takeDamage(amount) {
+  takeDamage(amount, isCritical = false) {
     this.health -= amount;
 
     // Create floating damage number
     window.game.eventSystem.emit('createFloatingDamage', {
       position: this.position.clone(),
-      damage: amount
+      damage: amount,
+      isCritical: isCritical
     });
 
     // Check if dead

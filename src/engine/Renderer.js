@@ -1,7 +1,10 @@
 // src/engine/Renderer.js (partial update - only showing the relevant method)
 
 export class Renderer {
-  constructor() {
+  constructor(eventSystem) {
+    // Store event system
+    this.eventSystem = eventSystem;
+    
     // Initialize renderer properties
     this.renderer = new window['THREE'].WebGLRenderer({ antialias: true });
     this.scene = new window['THREE'].Scene();
@@ -39,6 +42,9 @@ export class Renderer {
     // Enable shadows
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = window['THREE'].PCFSoftShadowMap;
+
+    // Register event listeners
+    this.eventSystem.on('createFloatingDamage', this.createFloatingDamage.bind(this));
   }
 
   initialize(containerId) {
@@ -143,9 +149,10 @@ export class Renderer {
     }
   }
 
-  render() {
+  render(delta = 0.016) {
     if (this.scene) {
-      this.updateHitEffects(0.016); // Assuming 60fps
+      this.updateHitEffects(delta);
+      this.updateFloatingDamage(delta);
     }
     this.renderer.render(this.scene, this.camera);
   }
@@ -635,6 +642,102 @@ export class Renderer {
         } catch (error) {
           console.warn('Error updating hit effect:', error);
           // Remove the effect if there's an error
+          if (object.parent) {
+            object.parent.remove(object);
+          }
+        }
+      }
+    });
+  }
+
+  createFloatingDamage(data) {
+    const { position, damage, isCritical = false } = data;
+    
+    // Create a canvas for the text
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 128;
+    canvas.height = 128;
+    
+    // Set up text style - 15% smaller
+    context.font = isCritical ? 'bold 102px Arial' : '68px Arial';
+    context.fillStyle = '#FFFFFF';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    
+    // Draw text
+    context.fillText(damage.toString(), 64, 64);
+    
+    // Create texture from canvas
+    const texture = new window['THREE'].CanvasTexture(canvas);
+    const material = new window['THREE'].MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 1
+    });
+    
+    // Create a simple plane geometry
+    const geometry = new window['THREE'].PlaneGeometry(2.5, 2.5);
+    
+    // Create mesh
+    const mesh = new window['THREE'].Mesh(geometry, material);
+    mesh.position.copy(position);
+    mesh.position.y += 0.5;
+    
+    // Make the mesh always face the camera
+    mesh.lookAt(this.camera.position);
+    
+    // Add to scene
+    this.scene.add(mesh);
+    
+    // Animation properties
+    mesh.userData.lifetime = 1.0;
+    mesh.userData.velocity = new window['THREE'].Vector3(0, 0.5, 0);
+    mesh.userData.fadeSpeed = 1.0;
+    mesh.userData.isFloatingDamage = true;
+    mesh.userData.maxHeight = position.y + 1.0;
+    mesh.userData.initialY = position.y + 0.5;
+    
+    // Update function for animation
+    const updateDamage = (delta) => {
+      mesh.userData.lifetime -= delta;
+      
+      // Update position with height limit
+      const currentHeight = mesh.position.y - mesh.userData.initialY;
+      if (currentHeight < 1.0) {
+        mesh.position.y += mesh.userData.velocity.y * delta;
+      }
+      
+      // Make the mesh always face the camera
+      mesh.lookAt(this.camera.position);
+      
+      // Fade out
+      mesh.material.opacity = mesh.userData.lifetime * mesh.userData.fadeSpeed;
+      
+      // Remove when done
+      if (mesh.userData.lifetime <= 0) {
+        this.scene.remove(mesh);
+      }
+    };
+    
+    // Store update function
+    mesh.userData.update = updateDamage;
+  }
+
+  // Add method to update floating damage
+  updateFloatingDamage(delta) {
+    if (!this.scene) return;
+    
+    // Create a copy of the scene's children to avoid modification during traversal
+    const children = [...this.scene.children];
+    
+    children.forEach(object => {
+      if (object.userData.isFloatingDamage && object.userData.update) {
+        try {
+          object.userData.update(delta);
+        } catch (error) {
+          console.warn('Error updating floating damage:', error);
+          // Remove the text if there's an error
           if (object.parent) {
             object.parent.remove(object);
           }
